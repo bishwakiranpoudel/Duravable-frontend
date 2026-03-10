@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&display=swap");
+
+@layer base {
+  :root {
+    --background: 40 33% 97%;
+    --foreground: 220 30% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 30% 14%;
+
+    --primary: 220 55% 22%;
+    --primary-foreground: 40 33% 97%;
+
+    --secondary: 158 30% 90%;
+    --secondary-foreground: 158 35% 22%;
+
+    --muted: 35 20% 93%;
+    --muted-foreground: 220 12% 48%;
+
+    --accent: 172 50% 38%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 65% 52%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 35 18% 88%;
+    --input: 35 18% 88%;
+    --ring: 220 55% 22%;
+
+    --radius: 0.875rem;
+
+    --chat-user: 220 55% 22%;
+    --chat-user-foreground: 40 33% 97%;
+    --chat-ai: 0 0% 100%;
+    --chat-ai-foreground: 220 30% 14%;
+    --chat-success: 158 55% 38%;
+    --chat-warning: 38 92% 55%;
+    --chat-ai-border: 35 18% 88%;
+
+    --sidebar-background: 220 55% 22%;
+    --sidebar-foreground: 220 20% 82%;
+    --sidebar-primary: 172 50% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 45% 28%;
+    --sidebar-accent-foreground: 220 15% 90%;
+    --sidebar-border: 220 40% 30%;
+    --sidebar-ring: 172 50% 48%;
+    --sidebar-muted: 220 25% 40%;
+
+    --gradient-trust: linear-gradient(135deg, hsl(220, 55%, 22%), hsl(220, 45%, 32%));
+    --gradient-health: linear-gradient(135deg, hsl(172, 50%, 38%), hsl(158, 45%, 42%));
+    --gradient-warm: linear-gradient(180deg, hsl(40, 33%, 97%), hsl(35, 25%, 94%));
+
+    --font-display: "Source Serif 4", Georgia, serif;
+    --font-body: "DM Sans", system-ui, sans-serif;
+    --font-brand: "Bebas Neue", "Arial Narrow", sans-serif;
+
+    --shadow-card: 0 1px 3px 0 hsla(220, 30%, 14%, 0.04),
+      0 4px 12px -2px hsla(220, 30%, 14%, 0.06);
+    --shadow-card-hover: 0 4px 16px -2px hsla(220, 30%, 14%, 0.1),
+      0 8px 24px -4px hsla(220, 30%, 14%, 0.08);
+    --shadow-elevated: 0 8px 30px -6px hsla(220, 30%, 14%, 0.12);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsla(220, 20%, 60%, 0.3) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 5px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsla(220, 20%, 60%, 0.3);
+    border-radius: 9999px;
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-card-hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+  .gradient-trust {
+    background: var(--gradient-trust);
+  }
+  .gradient-health {
+    background: var(--gradient-health);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
