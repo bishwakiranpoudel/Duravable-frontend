@@ -23,16 +23,16 @@ export default function DoctorCard({ doctor, onSelect, index }: DoctorCardProps)
           {doctor.avatar}
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-display text-[13px] sm:text-[15px] font-semibold text-foreground">
+          <h4 className="font-display text-[13px] sm:text-[15px] font-semibold text-white">
             {doctor.name}
           </h4>
-          <p className="text-xs sm:text-sm text-accent font-semibold font-body">
+          <p className="text-xs sm:text-sm text-foreground-secondary font-semibold font-body">
             {doctor.specialty}
           </p>
-          <div className="mt-1 sm:mt-1.5 flex flex-wrap items-center gap-x-2.5 sm:gap-x-3 gap-y-0.5 text-[11px] sm:text-xs text-muted-foreground">
+          <div className="mt-1 sm:mt-1.5 flex flex-wrap items-center gap-x-2.5 sm:gap-x-3 gap-y-0.5 text-[11px] sm:text-xs text-foreground-tertiary">
             <span className="flex items-center gap-1">
-              <Star className="h-3 w-3 sm:h-3.5 sm:w-3.5 fill-chat-warning text-chat-warning" />
-              <span className="font-medium text-foreground">{doctor.rating}</span>
+              <Star className="h-3 w-3 sm:h-3.5 sm:w-3.5 fill-primary text-primary" />
+              <span className="font-medium text-white">{doctor.rating}</span>
             </span>
             <span className="flex items-center gap-1">
               <MapPin className="h-3 w-3" />
@@ -43,11 +43,11 @@ export default function DoctorCard({ doctor, onSelect, index }: DoctorCardProps)
               {doctor.available}
             </span>
           </div>
-          <p className="mt-1.5 sm:mt-2 text-[12px] sm:text-[13px] text-muted-foreground leading-relaxed line-clamp-2">
+          <p className="mt-1.5 sm:mt-2 text-[12px] sm:text-[13px] text-foreground-tertiary leading-relaxed line-clamp-2">
             {doctor.description}
           </p>
           {doctor.estimatedVisitCost && (
-            <p className="mt-1 text-[11px] font-medium text-accent">
+            <p className="mt-1 text-[11px] font-medium text-foreground-secondary">
               Estimated visit cost: ${doctor.estimatedVisitCost} (cash payment)
             </p>
           )}
@@ -56,7 +56,7 @@ export default function DoctorCard({ doctor, onSelect, index }: DoctorCardProps)
       <button
         type="button"
         onClick={() => onSelect(doctor)}
-        className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl gradient-health px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm font-semibold text-accent-foreground hover:opacity-90 transition-opacity"
+        className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl gradient-trust px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
       >
         Select Doctor
         <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />

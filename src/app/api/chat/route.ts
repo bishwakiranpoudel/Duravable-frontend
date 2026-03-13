@@ -183,6 +183,16 @@ export async function POST(req: NextRequest) {
       funds_allocated: fundsToStore,
     });
 
+    // Only expose amount + allocation steps when this is the specialist/test direct-allocation flow
+    // (user gave amount after we asked in that context), not during normal symptom → doctor flow.
+    const showingDoctorsThisTurn = (doctorsList?.length ?? 0) > 0;
+    const allocationAckInReply =
+      /health card|pay at the office|Durable Health Network|standard.*process|deposit/i.test(text);
+    const showAllocationSteps =
+      parsedAmount != null &&
+      !showingDoctorsThisTurn &&
+      allocationAckInReply;
+
     const responsePayload: {
       conversationId: string;
       message: { id: string; role: "assistant"; content: string; timestamp: Date };
@@ -190,6 +200,7 @@ export async function POST(req: NextRequest) {
       doctors?: ConversationMessageDoctor[];
       amount?: number;
       isLargeProcedure?: boolean;
+      showAllocationSteps?: boolean;
     } = {
       conversationId,
       message: {
@@ -201,9 +212,10 @@ export async function POST(req: NextRequest) {
       recommendedDoctorType: recommendedDoctorType ?? undefined,
       doctors: doctorsList?.length ? doctorsList : undefined,
     };
-    if (parsedAmount != null) {
+    if (showAllocationSteps && parsedAmount != null) {
       responsePayload.amount = parsedAmount;
       responsePayload.isLargeProcedure = parsedAmount >= PAYMENT_MODEL.LARGE_PROCEDURE_THRESHOLD_USD;
+      responsePayload.showAllocationSteps = true;
     }
     return NextResponse.json(responsePayload);
   } catch (e) {

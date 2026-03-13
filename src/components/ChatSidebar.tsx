@@ -55,12 +55,12 @@ export default function ChatSidebar({
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-[100dvh] w-[280px] flex-col gradient-trust transition-transform duration-300 md:relative md:translate-x-0 ${
+        className={`fixed left-0 top-0 z-50 flex h-[100dvh] w-[280px] flex-col bg-background border-r border-sidebar-border transition-transform duration-300 md:relative md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex items-center justify-between px-5 py-4 sm:py-5">
-          <h1 className="font-brand text-[22px] sm:text-[26px] tracking-wide text-sidebar-accent-foreground uppercase">
+          <h1 className="font-brand text-[22px] sm:text-[26px] tracking-wide text-primary uppercase">
             DVRABLE
           </h1>
           <button
@@ -69,7 +69,7 @@ export default function ChatSidebar({
             className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-sidebar-accent transition-colors md:hidden"
             aria-label="Close sidebar"
           >
-            <X className="h-4 w-4 text-sidebar-foreground" />
+            <X className="h-4 w-4 text-foreground" />
           </button>
         </div>
 
@@ -77,20 +77,20 @@ export default function ChatSidebar({
           <button
             type="button"
             onClick={() => { onNewConversation(); onClose(); }}
-            className="flex w-full items-center gap-2 rounded-xl border border-sidebar-border px-3.5 py-2.5 text-sm font-medium text-sidebar-accent-foreground hover:bg-sidebar-accent transition-colors"
+            className="flex w-full items-center gap-2 rounded-xl border border-sidebar-border px-3.5 py-2.5 text-sm font-medium text-foreground hover:bg-sidebar-accent transition-colors"
           >
-            <Plus className="h-4 w-4 text-sidebar-primary" />
+            <Plus className="h-4 w-4 text-primary" />
             New conversation
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 pt-3 scrollbar-thin">
-          <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-muted">
+          <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-foreground-secondary">
             Recent chats
           </p>
           <div className="space-y-0.5">
             {conversations.length === 0 ? (
-              <p className="px-2 text-[11px] text-sidebar-foreground/60">No past conversations yet.</p>
+              <p className="px-2 text-[11px] text-foreground-tertiary">No past conversations yet.</p>
             ) : (
               conversations.map((c) => (
                 <button
@@ -102,12 +102,12 @@ export default function ChatSidebar({
                     currentConversationId === c.conversation_id ? "bg-sidebar-accent" : ""
                   }`}
                 >
-                  <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-sidebar-muted group-hover:text-sidebar-primary" />
+                  <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-foreground-tertiary group-hover:text-primary" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-medium text-sidebar-accent-foreground">
+                    <p className="truncate text-[13px] font-medium text-foreground">
                       {c.title || "Conversation"}
                     </p>
-                    <p className="truncate text-[11px] text-sidebar-foreground/50">
+                    <p className="truncate text-[11px] text-foreground-tertiary">
                       {c.doctor_recommendation
                         ? `${formatDate(c.timestamp)} · ${c.doctor_recommendation}`
                         : formatDate(c.timestamp)}
@@ -126,22 +126,22 @@ export default function ChatSidebar({
                 <User className="h-4 w-4 text-sidebar-primary" />
               </div>
               <div>
-                <span className="text-[13px] sm:text-sm font-semibold text-sidebar-accent-foreground">
+                <span className="text-[13px] sm:text-sm font-semibold text-foreground">
                   {mockProfile.name}
                 </span>
-                <p className="text-[10px] text-sidebar-foreground/50">
+                <p className="text-[10px] text-foreground-tertiary">
                   Member since 2022
                 </p>
               </div>
             </div>
             <div className="space-y-1.5 text-[11px]">
-              <div className="flex items-center gap-2 text-sidebar-foreground/70">
-                <CreditCard className="h-3 w-3 text-sidebar-primary" />
+              <div className="flex items-center gap-2 text-foreground-secondary">
+                <CreditCard className="h-3 w-3 text-primary" />
                 <span>ID: {mockProfile.memberId}</span>
               </div>
               {mockProfile.healthCardLast4 && (
-                <div className="flex items-center gap-2 text-sidebar-foreground/70">
-                  <ShieldCheck className="h-3 w-3 text-sidebar-primary" />
+                <div className="flex items-center gap-2 text-foreground-secondary">
+                  <ShieldCheck className="h-3 w-3 text-primary" />
                   <span>Health card ···{mockProfile.healthCardLast4}</span>
                 </div>
               )}

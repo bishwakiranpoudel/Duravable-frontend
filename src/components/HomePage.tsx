@@ -5,7 +5,7 @@ import { Menu, ShieldCheck, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import ChatSidebar from "@/components/ChatSidebar";
 import type { ConversationItem } from "@/components/ChatSidebar";
-import ChatInput from "@/components/ChatInput";
+import ChatInput, { type ChatInputHandle } from "@/components/ChatInput";
 import ChatMessageComponent from "@/components/ChatMessage";
 import TypingIndicator from "@/components/TypingIndicator";
 import type { ChatMessage, Doctor } from "@/lib/mockData";
@@ -60,6 +60,20 @@ export default function HomePage() {
   const [selectedDoctorInfo, setSelectedDoctorInfo] = useState<{ id: string; name: string; specialty?: string } | null>(null);
   const [fundsAllocated, setFundsAllocated] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<ChatInputHandle>(null);
+  const prevTypingRef = useRef(isTyping);
+
+  useEffect(() => {
+    if (prevTypingRef.current && !isTyping) {
+      setTimeout(() => chatInputRef.current?.focus(), 100);
+    }
+    prevTypingRef.current = isTyping;
+  }, [isTyping]);
+
+  useEffect(() => {
+    const t = setTimeout(() => chatInputRef.current?.focus(), 300);
+    return () => clearTimeout(t);
+  }, []);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -81,12 +95,12 @@ export default function HomePage() {
     if (sidebarOpen) loadConversations();
   }, [sidebarOpen, loadConversations]);
 
-  const handleResumeConversation = useCallback(async (id: string) => {
+  const handleResumeConversation = useCallback(async (id: string, fromOngoingPicker = false) => {
     setShowOngoingConversationPicker(false);
     setIsResumingConversation(true);
     const ongoingConvId = conversationId;
     try {
-      if (ongoingConvId && ongoingConvId !== id) {
+      if (fromOngoingPicker && ongoingConvId && ongoingConvId !== id) {
         await fetch(`/api/conversations/${encodeURIComponent(ongoingConvId)}`, { method: "DELETE" });
       }
       const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`);
@@ -189,17 +203,28 @@ export default function HomePage() {
         timestamp: new Date(data.message.timestamp),
       };
 
-      addMessage(assistantMsg);
-
       const isOngoingPicker = suggestsConversationPicker(data.message?.content ?? "");
+      const showingDoctorsThisTurn = (data.doctors?.length ?? 0) > 0;
+      const content = (data.message?.content || "") as string;
+      const looksLikeRecommendation =
+        /recommend|suggest seeing|you should see a/i.test(content) &&
+        /physician|doctor|primary care|specialist|provider/i.test(content);
+      const searchType = data.recommendedDoctorType || (looksLikeRecommendation ? "Primary Care Physician" : null);
+      const willSearchDoctors = !isOngoingPicker && !data.doctors?.length && searchType;
+
+      // If we're about to run a client-side doctor search, keep typing visible and add the assistant message only after search completes.
+      if (!willSearchDoctors) {
+        addMessage(assistantMsg);
+      }
+
       if (isOngoingPicker) {
         setShowOngoingConversationPicker(true);
         loadConversations();
       }
 
-      // Specialist/large-procedure flow: user provided amount → show allocation steps. Only when we're NOT also showing the doctor list (auth is after selecting a doctor or after giving amount in specialist flow).
-      const showingDoctorsThisTurn = (data.doctors?.length ?? 0) > 0;
-      if (data.amount != null && typeof data.amount === "number" && !showingDoctorsThisTurn) {
+      // Specialist/test direct-allocation flow only: show allocation steps when user gave amount after we asked in that context (referred to specialist / need a test). Never show auth here during normal symptom → recommend doctor flow; auth after doctor selection is handled in handleSelectDoctor.
+      const isDirectAllocationFlow = data.showAllocationSteps === true;
+      if (data.amount != null && typeof data.amount === "number" && !showingDoctorsThisTurn && isDirectAllocationFlow) {
         const amountStr = String(data.amount);
         setFundsAllocated(amountStr);
         const authMsgs = getAuthorizationMessages(amountStr);
@@ -219,11 +244,6 @@ export default function HomePage() {
 
       // Show doctor cards only when we're NOT in the ongoing "pick a conversation" flow.
       if (!isOngoingPicker) {
-        const content = (data.message?.content || "") as string;
-        const looksLikeRecommendation =
-          /recommend|suggest seeing|you should see a/i.test(content) &&
-          /physician|doctor|primary care|specialist|provider/i.test(content);
-
         if (data.doctors?.length) {
           const docMsg: ChatMessage = {
             id: crypto.randomUUID(),
@@ -234,24 +254,23 @@ export default function HomePage() {
             doctors: data.doctors as Doctor[],
           };
           addMessage(docMsg);
-        } else {
-          const searchType = data.recommendedDoctorType || (looksLikeRecommendation ? "Primary Care Physician" : null);
-          if (searchType) {
-            const typeParam = encodeURIComponent(searchType);
-            const searchRes = await fetch(`/api/doctors/search?type=${typeParam}`);
-            if (searchRes.ok) {
-              const { doctors } = await searchRes.json();
-              if (doctors?.length) {
-                const docMsg: ChatMessage = {
-                  id: crypto.randomUUID(),
-                  role: "assistant",
-                  content:
-                    "Here are doctors near you who accept **cash payment** (Cedar Park, TX 78613):",
-                  timestamp: new Date(),
-                  doctors,
-                };
-                addMessage(docMsg);
-              }
+        } else if (searchType) {
+          // Keep typing indicator visible while searching, then add assistant message + doctor list together.
+          const typeParam = encodeURIComponent(searchType);
+          const searchRes = await fetch(`/api/doctors/search?type=${typeParam}`);
+          addMessage(assistantMsg);
+          if (searchRes.ok) {
+            const { doctors } = await searchRes.json();
+            if (doctors?.length) {
+              const docMsg: ChatMessage = {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content:
+                  "Here are doctors near you who accept **cash payment** (Cedar Park, TX 78613):",
+                timestamp: new Date(),
+                doctors,
+              };
+              addMessage(docMsg);
             }
           }
         }
@@ -331,7 +350,7 @@ export default function HomePage() {
         onClose={() => setSidebarOpen(false)}
         conversations={conversations}
         currentConversationId={conversationId}
-        onSelectConversation={handleResumeConversation}
+        onSelectConversation={(id) => handleResumeConversation(id, false)}
         onNewConversation={handleNewConversation}
         isResuming={isResumingConversation}
       />
@@ -346,9 +365,6 @@ export default function HomePage() {
           >
             <Menu className="h-5 w-5 text-foreground" />
           </button>
-          <h2 className="font-brand text-lg sm:text-xl tracking-wide text-foreground uppercase">
-            DVRABLE
-          </h2>
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <div className="hidden md:flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1">
               <ShieldCheck className="h-3 w-3 text-secondary-foreground" />
@@ -358,7 +374,7 @@ export default function HomePage() {
             </div>
             <div className="flex items-center gap-1">
               <Wifi className="h-3 w-3 text-chat-success" />
-              <span className="text-[11px] text-muted-foreground font-body">
+              <span className="text-[11px] text-foreground-tertiary font-body">
                 Online
               </span>
             </div>
@@ -380,7 +396,7 @@ export default function HomePage() {
 
             {showQuickActions && !isTyping && (
               <div className="px-3 sm:px-4 py-3 sm:py-4">
-                <p className="text-xs font-medium text-muted-foreground mb-2 sm:mb-2.5 font-body">
+                <p className="text-xs font-medium text-foreground-secondary mb-2 sm:mb-2.5 font-body">
                   Quick actions
                 </p>
                 <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
@@ -389,7 +405,7 @@ export default function HomePage() {
                       key={action.label}
                       type="button"
                       onClick={() => handleSend(action.label)}
-                      className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 rounded-xl border border-border bg-card px-3 sm:px-4 py-2.5 text-[13px] sm:text-sm font-medium text-foreground shadow-card hover:shadow-card-hover hover:border-accent/30 transition-all duration-200 font-body"
+                      className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 rounded-xl border border-border bg-card px-3 sm:px-4 py-2.5 text-[13px] sm:text-sm font-medium text-white shadow-card hover:shadow-card-hover hover:border-accent/30 transition-all duration-200 font-body"
                     >
                       <span>{action.icon}</span>
                       <span className="truncate">{action.label}</span>
@@ -401,29 +417,29 @@ export default function HomePage() {
 
             {showOngoingConversationPicker && !isTyping && (
               <div className="px-3 sm:px-4 py-3 sm:py-4">
-                <p className="text-xs font-medium text-muted-foreground mb-2 sm:mb-2.5 font-body">
+                <p className="text-xs font-medium text-foreground-secondary mb-2 sm:mb-2.5 font-body">
                   Continue a conversation
                 </p>
-                <p className="text-[11px] text-muted-foreground mb-3 font-body">
+                <p className="text-[11px] text-foreground-tertiary mb-3 font-body">
                   Tap one to pick up where you left off (symptoms, doctor, funds).
                 </p>
                 <div className="space-y-2">
                   {(() => {
                     const otherConversations = conversations.filter((c) => c.conversation_id !== conversationId);
                     return otherConversations.length === 0 ? (
-                      <p className="text-xs text-muted-foreground font-body">No past conversations yet. Start a new chat above.</p>
+                      <p className="text-xs text-foreground-tertiary font-body">No past conversations yet. Start a new chat above.</p>
                     ) : (
                       otherConversations.map((c) => (
                       <button
                         key={c.conversation_id}
                         type="button"
-                        onClick={() => handleResumeConversation(c.conversation_id)}
+                        onClick={() => handleResumeConversation(c.conversation_id, true)}
                         className="flex w-full flex-col items-start gap-0.5 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-card hover:shadow-card-hover hover:border-accent/30 transition-all duration-200"
                       >
-                        <span className="text-[13px] font-medium text-foreground truncate w-full">
+                        <span className="text-[13px] font-medium text-white truncate w-full">
                           {c.title || "Conversation"}
                         </span>
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-[11px] text-foreground-tertiary">
                           {c.doctor_recommendation
                             ? `${formatConversationDate(c.timestamp)} · ${c.doctor_recommendation}`
                             : formatConversationDate(c.timestamp)}
@@ -441,7 +457,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <ChatInput onSend={handleSend} disabled={isTyping} />
+        <ChatInput ref={chatInputRef} onSend={handleSend} disabled={isTyping} />
       </div>
     </div>
   );

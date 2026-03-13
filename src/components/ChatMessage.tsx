@@ -4,7 +4,7 @@ import ReactMarkdown from "react-markdown";
 import DoctorCard from "./DoctorCard";
 import type { ChatMessage as ChatMessageType, Doctor } from "@/lib/mockData";
 import { motion } from "framer-motion";
-import { ShieldCheck, CircleCheckBig, Heart } from "lucide-react";
+import { ShieldCheck, CircleCheckBig, Bot } from "lucide-react";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -12,9 +12,9 @@ interface ChatMessageProps {
 }
 
 const authIcons: Record<number, React.ReactNode> = {
-  1: <ShieldCheck className="h-4 w-4 text-accent animate-pulse" />,
-  2: <CircleCheckBig className="h-4 w-4 text-chat-success" />,
-  3: <CircleCheckBig className="h-4 w-4 text-chat-success" />,
+  1: <ShieldCheck className="h-4 w-4 text-primary animate-pulse" />,
+  2: <CircleCheckBig className="h-4 w-4 text-primary" />,
+  3: <CircleCheckBig className="h-4 w-4 text-primary" />,
 };
 
 export default function ChatMessageComponent({
@@ -34,15 +34,15 @@ export default function ChatMessageComponent({
         className={`flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl font-display text-xs font-bold ${
           isUser
             ? "gradient-trust text-primary-foreground"
-            : "gradient-health text-accent-foreground"
+            : "gradient-trust text-primary-foreground"
         }`}
       >
-        {isUser ? "AJ" : <Heart className="h-4 w-4" />}
+        {isUser ? "AJ" : <Bot className="h-4 w-4" />}
       </div>
 
       <div className="max-w-[88%] sm:max-w-[80%] md:max-w-[70%] space-y-2 sm:space-y-3">
         {!isUser && (
-          <span className="text-[10px] sm:text-[11px] font-semibold text-accent font-body ml-1">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-primary font-body ml-1">
             DVRABLE Bot
           </span>
         )}
@@ -50,7 +50,7 @@ export default function ChatMessageComponent({
           className={`rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 ${
             isUser
               ? "rounded-tr-sm gradient-trust text-primary-foreground"
-              : "rounded-tl-sm bg-card text-card-foreground border border-chat-ai-border shadow-card"
+              : "rounded-tl-sm bg-card text-white border border-chat-ai-border shadow-card"
           }`}
         >
           {message.authorizationStep &&
@@ -60,8 +60,8 @@ export default function ChatMessageComponent({
               </div>
             )}
           <div
-            className={`prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-ul:my-1 text-[13px] sm:text-sm ${
-              isUser ? "prose-invert" : "prose-strong:text-foreground"
+            className={`prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-ul:my-1 text-[13px] sm:text-sm [&_*]:text-white ${
+              isUser ? "prose-invert" : "prose-invert prose-strong:text-white"
             }`}
           >
             <ReactMarkdown>{message.content}</ReactMarkdown>

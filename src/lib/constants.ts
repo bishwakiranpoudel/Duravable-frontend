@@ -2,11 +2,11 @@
  * App constants: payment model, location, and copy.
  */
 
-/** Primary flow: cash payment. Secondary: insurance network for large procedures (e.g. $5000+). */
+/** Primary flow: cash payment. Secondary: insurance network for large procedures (e.g. $500+). */
 export const PAYMENT_MODEL = {
   PRIMARY: "cash" as const,
   SECONDARY: "insurance_network" as const,
-  LARGE_PROCEDURE_THRESHOLD_USD: 5000,
+  LARGE_PROCEDURE_THRESHOLD_USD: 500,
 };
 
 /** Doctor discovery is centered around this location. */

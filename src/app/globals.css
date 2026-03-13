@@ -6,23 +6,25 @@
 
 @layer base {
   :root {
-    --background: 40 33% 97%;
-    --foreground: 220 30% 14%;
+    --background: 0 0% 10%;
+    --foreground: 0 0% 100%;
+    --foreground-secondary: 30 16% 66%;
+    --foreground-tertiary: 216 11% 65%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 30% 14%;
+    --card: 0 0% 16%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 30% 14%;
+    --popover: 0 0% 14%;
+    --popover-foreground: 0 0% 100%;
 
-    --primary: 220 55% 22%;
-    --primary-foreground: 40 33% 97%;
+    --primary: 36 36% 53%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 158 30% 90%;
-    --secondary-foreground: 158 35% 22%;
+    --secondary: 36 25% 35%;
+    --secondary-foreground: 30 16% 66%;
 
-    --muted: 35 20% 93%;
-    --muted-foreground: 220 12% 48%;
+    --muted: 0 0% 18%;
+    --muted-foreground: 216 11% 65%;
 
     --accent: 172 50% 38%;
     --accent-foreground: 0 0% 100%;
@@ -30,43 +32,43 @@
     --destructive: 0 65% 52%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 35 18% 88%;
-    --input: 35 18% 88%;
-    --ring: 220 55% 22%;
+    --border: 0 0% 22%;
+    --input: 0 0% 22%;
+    --ring: 36 36% 53%;
 
     --radius: 0.875rem;
 
-    --chat-user: 220 55% 22%;
-    --chat-user-foreground: 40 33% 97%;
-    --chat-ai: 0 0% 100%;
-    --chat-ai-foreground: 220 30% 14%;
+    --chat-user: 36 36% 53%;
+    --chat-user-foreground: 0 0% 100%;
+    --chat-ai: 0 0% 16%;
+    --chat-ai-foreground: 0 0% 100%;
     --chat-success: 158 55% 38%;
     --chat-warning: 38 92% 55%;
-    --chat-ai-border: 35 18% 88%;
+    --chat-ai-border: 0 0% 28%;
 
-    --sidebar-background: 220 55% 22%;
-    --sidebar-foreground: 220 20% 82%;
-    --sidebar-primary: 172 50% 48%;
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 36 36% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 45% 28%;
-    --sidebar-accent-foreground: 220 15% 90%;
-    --sidebar-border: 220 40% 30%;
-    --sidebar-ring: 172 50% 48%;
-    --sidebar-muted: 220 25% 40%;
+    --sidebar-accent: 0 0% 18%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 22%;
+    --sidebar-ring: 36 36% 53%;
+    --sidebar-muted: 30 16% 78%;
 
-    --gradient-trust: linear-gradient(135deg, hsl(220, 55%, 22%), hsl(220, 45%, 32%));
+    --gradient-trust: linear-gradient(135deg, hsl(36, 36%, 53%), hsl(36, 30%, 45%));
     --gradient-health: linear-gradient(135deg, hsl(172, 50%, 38%), hsl(158, 45%, 42%));
-    --gradient-warm: linear-gradient(180deg, hsl(40, 33%, 97%), hsl(35, 25%, 94%));
+    --gradient-warm: linear-gradient(180deg, hsl(0, 0%, 10%), hsl(0, 0%, 8%));
 
     --font-display: "Source Serif 4", Georgia, serif;
     --font-body: "DM Sans", system-ui, sans-serif;
-    --font-brand: "Bebas Neue", "Arial Narrow", sans-serif;
+    --font-brand: Georgia, "Times New Roman", serif;
 
-    --shadow-card: 0 1px 3px 0 hsla(220, 30%, 14%, 0.04),
-      0 4px 12px -2px hsla(220, 30%, 14%, 0.06);
-    --shadow-card-hover: 0 4px 16px -2px hsla(220, 30%, 14%, 0.1),
-      0 8px 24px -4px hsla(220, 30%, 14%, 0.08);
-    --shadow-elevated: 0 8px 30px -6px hsla(220, 30%, 14%, 0.12);
+    --shadow-card: 0 1px 3px 0 hsla(0, 0%, 0%, 0.3),
+      0 4px 12px -2px hsla(0, 0%, 0%, 0.25);
+    --shadow-card-hover: 0 4px 16px -2px hsla(0, 0%, 0%, 0.35),
+      0 8px 24px -4px hsla(0, 0%, 0%, 0.3);
+    --shadow-elevated: 0 8px 30px -6px hsla(0, 0%, 0%, 0.4);
   }
 }
 
@@ -91,7 +93,7 @@
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: hsla(220, 20%, 60%, 0.3) transparent;
+    scrollbar-color: hsl(var(--foreground-tertiary) / 0.5) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 5px;
@@ -100,7 +102,7 @@
     background: transparent;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: hsla(220, 20%, 60%, 0.3);
+    background-color: hsl(var(--foreground-tertiary) / 0.5);
     border-radius: 9999px;
   }
   .shadow-card {
