@@ -70,7 +70,7 @@ export async function chatWithGemini(
     : CHAT_SYSTEM;
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
+    model: "gemini-3-flash-preview",
     contents,
     config: {
       systemInstruction,
@@ -130,7 +130,7 @@ Return only the JSON object. No explanation, no code fence, no backticks. Exampl
 
   try {
     let interaction = await ai.interactions.create({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       input,
       tools: [{ type: "google_search" as const }],
     });
