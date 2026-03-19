@@ -233,9 +233,9 @@ export async function POST(req: NextRequest) {
         const allMessages: ConversationMessage[] = [...priorMessages, userMsg, assistantMsg, ...doctorListMessage];
         await setConversation(conversationId, allMessages, {
           doctor_recommendation: type,
-          symptoms: contextRecord.symptoms ?? [],
-          selected_doctor: selectedDoctor ?? contextRecord.selected_doctor ?? null,
-          funds_allocated: fundsAllocated ?? contextRecord.funds_allocated ?? null,
+          symptoms: contextRecord?.symptoms ?? [],
+          selected_doctor: selectedDoctor ?? contextRecord?.selected_doctor ?? null,
+          funds_allocated: fundsAllocated ?? contextRecord?.funds_allocated ?? null,
         });
         return NextResponse.json({
           conversationId,
@@ -254,9 +254,9 @@ export async function POST(req: NextRequest) {
         const allMessages: ConversationMessage[] = [...priorMessages, userMsg, assistantMsg];
         await setConversation(conversationId, allMessages, {
           doctor_recommendation: type,
-          symptoms: contextRecord.symptoms ?? [],
-          selected_doctor: selectedDoctor ?? contextRecord.selected_doctor ?? null,
-          funds_allocated: fundsAllocated ?? contextRecord.funds_allocated ?? null,
+          symptoms: contextRecord?.symptoms ?? [],
+          selected_doctor: selectedDoctor ?? contextRecord?.selected_doctor ?? null,
+          funds_allocated: fundsAllocated ?? contextRecord?.funds_allocated ?? null,
           pending_doctor_details: true,
         });
         return NextResponse.json({
