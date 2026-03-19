@@ -1,10 +1,16 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import DoctorCard from "./DoctorCard";
-import type { ChatMessage as ChatMessageType, Doctor } from "@/lib/mockData";
+import type { ChatMessage as ChatMessageType, Doctor, CalendarEventPayload } from "@/lib/mockData";
 import { motion } from "framer-motion";
-import { ShieldCheck, CircleCheckBig, Bot } from "lucide-react";
+import { ShieldCheck, CircleCheckBig, Bot, CalendarPlus } from "lucide-react";
+
+const AddToCalendarButton = dynamic(
+  () => import("add-to-calendar-button-react").then((mod) => mod.AddToCalendarButton),
+  { ssr: false }
+);
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -66,13 +72,35 @@ export default function ChatMessageComponent({
           >
             <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
+          {!isUser && message.calendarEvent && (
+            <div className="mt-3 pt-3 border-t border-white/20" key={`add-to-cal-${message.id}`}>
+              <p className="text-[11px] font-medium text-white/90 mb-2 flex items-center gap-1.5">
+                <CalendarPlus className="h-3.5 w-3.5" />
+                Add to calendar
+              </p>
+              <AddToCalendarButton
+                name={message.calendarEvent.name}
+                startDate={message.calendarEvent.startDate}
+                startTime={message.calendarEvent.startTime}
+                endTime={message.calendarEvent.endTime}
+                timeZone={message.calendarEvent.timeZone ?? "America/Chicago"}
+                description={message.calendarEvent.description}
+                location={message.calendarEvent.location}
+                options={["Apple", "Google", "Outlook.com", "Yahoo", "iCal"]}
+                buttonStyle="round"
+                size="5"
+                lightMode="light"
+                styleLight="--btn-background: rgba(255,255,255,0.95); --btn-text: #1a1a1a; --btn-text-hover: #1a1a1a;"
+              />
+            </div>
+          )}
         </div>
 
         {message.doctors && (
           <div className="grid gap-2 sm:gap-3">
             {message.doctors.map((doc, i) => (
               <DoctorCard
-                key={doc.id}
+                key={doc?.id ?? `doctor-${i}`}
                 doctor={doc}
                 onSelect={onSelectDoctor}
                 index={i}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   MessageSquare,
   Plus,
@@ -7,8 +8,12 @@ import {
   CreditCard,
   ShieldCheck,
   X,
+  CalendarCheck,
+  ChevronRight,
+  CalendarDays,
 } from "lucide-react";
 import { mockProfile } from "@/lib/mockData";
+import type { AppointmentRecord } from "@/lib/conversation-types";
 
 export interface ConversationItem {
   conversation_id: string;
@@ -25,6 +30,7 @@ interface ChatSidebarProps {
   onSelectConversation: (id: string) => void;
   onNewConversation: () => void;
   isResuming?: boolean;
+  appointments?: AppointmentRecord[];
 }
 
 export default function ChatSidebar({
@@ -35,6 +41,7 @@ export default function ChatSidebar({
   onSelectConversation,
   onNewConversation,
   isResuming = false,
+  appointments = [],
 }: ChatSidebarProps) {
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -43,6 +50,16 @@ export default function ChatSidebar({
     const diff = (now.getTime() - d.getTime()) / (24 * 60 * 60 * 1000);
     if (diff < 7) return `${Math.floor(diff)}d ago`;
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  };
+  const formatAppointmentDateTime = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   };
   return (
     <>
@@ -80,21 +97,78 @@ export default function ChatSidebar({
             className="flex w-full items-center gap-2 rounded-xl border border-sidebar-border px-3.5 py-2.5 text-sm font-medium text-foreground hover:bg-sidebar-accent transition-colors"
           >
             <Plus className="h-4 w-4 text-primary" />
-            New conversation
+            New chat
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 pt-3 scrollbar-thin">
           <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-foreground-secondary">
-            Recent chats
+            My Appointments
+          </p>
+          <div className="mb-4">
+            {appointments.filter((a) => a.status === "scheduled").length === 0 ? (
+              <Link
+                href="/appointments"
+                onClick={onClose}
+                aria-label="No upcoming appointments — open My Appointments page"
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[13px] text-foreground-tertiary hover:bg-sidebar-accent hover:text-foreground transition-colors"
+              >
+                <CalendarDays className="h-4 w-4 shrink-0" />
+                <span>No upcoming appointments</span>
+                <ChevronRight className="h-4 w-4 shrink-0 ml-auto" />
+              </Link>
+            ) : (
+              <>
+                <div className="space-y-0.5 mb-2">
+                  {appointments
+                    .filter((a) => a.status === "scheduled")
+                    .slice(0, 2)
+                    .map((apt, idx) => (
+                      <button
+                        key={apt.id ?? `apt-${idx}`}
+                        type="button"
+                        disabled={isResuming}
+                        onClick={() => {
+                          onSelectConversation(apt.conversation_id);
+                          onClose();
+                        }}
+                        className="flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left hover:bg-sidebar-accent transition-colors group disabled:opacity-60 disabled:pointer-events-none border border-sidebar-border/50"
+                      >
+                        <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-medium text-foreground">
+                            {apt.doctor_name}
+                          </p>
+                          <p className="text-[11px] text-foreground-tertiary">
+                            {formatAppointmentDateTime(apt.datetime)}
+                            {apt.doctor_specialty ? ` · ${apt.doctor_specialty}` : ""}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-foreground-tertiary group-hover:text-primary" />
+                      </button>
+                    ))}
+                </div>
+                <Link
+                  href="/appointments"
+                  onClick={onClose}
+                  className="flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium text-primary hover:bg-sidebar-accent rounded-xl transition-colors"
+                >
+                  View all
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </>
+            )}
+          </div>
+          <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-foreground-secondary">
+            Recent Chats
           </p>
           <div className="space-y-0.5">
             {conversations.length === 0 ? (
-              <p className="px-2 text-[11px] text-foreground-tertiary">No past conversations yet.</p>
+              <p className="px-2 text-[11px] text-foreground-tertiary">No conversations yet.</p>
             ) : (
-              conversations.map((c) => (
+              conversations.map((c, idx) => (
                 <button
-                  key={c.conversation_id}
+                  key={c.conversation_id ?? `conv-${idx}`}
                   type="button"
                   disabled={isResuming}
                   onClick={() => { onSelectConversation(c.conversation_id); onClose(); }}

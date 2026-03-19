@@ -110,6 +110,22 @@ export const mockProfile: UserProfile = {
   healthCardLast4: "4521",
 };
 
+/** Event details for "Add to calendar" button (Google, Apple, Outlook, etc.). */
+export interface CalendarEventPayload {
+  /** Event title */
+  name: string;
+  /** YYYY-MM-DD */
+  startDate: string;
+  /** HH:MM (24h) for timed events */
+  startTime: string;
+  /** HH:MM (24h), e.g. 1 hour after start */
+  endTime: string;
+  /** IANA timezone, e.g. America/Chicago */
+  timeZone?: string;
+  description?: string;
+  location?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -117,6 +133,8 @@ export interface ChatMessage {
   timestamp: Date;
   doctors?: Doctor[];
   authorizationStep?: number;
+  /** When set, show "Add to calendar" button (e.g. after appointment scheduled). */
+  calendarEvent?: CalendarEventPayload;
 }
 
 /** Default funds amount when not available or "contact for pricing". */

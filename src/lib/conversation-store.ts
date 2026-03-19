@@ -46,6 +46,7 @@ type RecordMeta = Partial<
     | "payment_status"
     | "selected_doctor"
     | "funds_allocated"
+    | "pending_doctor_details"
   >
 >;
 
@@ -71,6 +72,7 @@ function toRecord(
     payment_status: meta.payment_status ?? prev?.payment_status ?? "none",
     selected_doctor: meta.selected_doctor !== undefined ? meta.selected_doctor : prev?.selected_doctor ?? null,
     funds_allocated: meta.funds_allocated !== undefined ? meta.funds_allocated : prev?.funds_allocated ?? null,
+    pending_doctor_details: meta.pending_doctor_details !== undefined ? meta.pending_doctor_details : prev?.pending_doctor_details ?? false,
     timestamp: prev?.timestamp ?? new Date().toISOString(),
   };
 }

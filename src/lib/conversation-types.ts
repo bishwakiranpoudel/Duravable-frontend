@@ -20,6 +20,17 @@ export interface ConversationMessageDoctor {
   estimatedVisitCost?: string;
 }
 
+/** Add-to-calendar payload for appointment messages. */
+export interface ConversationCalendarEvent {
+  name: string;
+  startDate: string;
+  startTime: string;
+  endTime: string;
+  timeZone?: string;
+  description?: string;
+  location?: string;
+}
+
 export interface ConversationMessage {
   id: string;
   role: MessageRole;
@@ -27,6 +38,8 @@ export interface ConversationMessage {
   timestamp: Date;
   /** Optional doctor list when assistant shows search results. */
   doctors?: ConversationMessageDoctor[];
+  /** Optional calendar event for "Add to calendar" (e.g. after scheduling). */
+  calendarEvent?: ConversationCalendarEvent;
 }
 
 export interface ConversationContext {
@@ -70,7 +83,23 @@ export interface ConversationRecord {
   selected_doctor?: SelectedDoctorInfo | null;
   /** Amount allocated to health card for this visit (e.g. "100") */
   funds_allocated?: string | null;
+  /** When true, next user message is treated as doctor name/clinic for search-by-details */
+  pending_doctor_details?: boolean;
   timestamp: string; // ISO
+}
+
+/** Appointment stored in Redis for "My Appointments" and scheduling flow. */
+export interface AppointmentRecord {
+  id: string;
+  conversation_id: string;
+  doctor_id: string;
+  doctor_name: string;
+  doctor_specialty?: string;
+  /** ISO date-time string for the scheduled slot */
+  datetime: string;
+  /** scheduled | completed | cancelled */
+  status: "scheduled" | "completed" | "cancelled";
+  created_at: string; // ISO
 }
 
 export const DEFAULT_CONTEXT: ConversationContext = {

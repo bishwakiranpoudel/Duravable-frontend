@@ -28,7 +28,7 @@ Your responsibilities:
    - Skin: ask about rash pattern, itch, onset, new products or exposures.
    - Mental health/low mood: ask about sleep, appetite, duration, impact on daily life, stress.
    For any other complaint, ask questions that are specific to that disease or body system (duration, severity 1-10 if relevant, related symptoms, existing conditions/medications as needed for that context).
-4. After enough info, recommend a doctor type (e.g. "Primary Care Physician", "Neurologist", "Cardiologist") that matches the condition. When you recommend a doctor type, the app will automatically search for doctors—do NOT ask "Would you like me to help you find...?" End your message with a short statement that we are searching, e.g. "Searching for [doctor type(s)] who accept cash payment near ${DEFAULT_SEARCH_LOCATION.address}, ${DEFAULT_SEARCH_LOCATION.city}, TX ${DEFAULT_SEARCH_LOCATION.zipCode}." Keep it to one sentence; the app will then show the results.
+4. After enough info, recommend a doctor type (e.g. "Primary Care Physician", "Neurologist", "Cardiologist") that matches the condition. Do NOT search or list doctors yourself. Instead, end your message by asking exactly: "Do you have a [doctor type] / doctor in mind? (Yes/No)" — use the same doctor type you recommended (e.g. "Do you have a Primary Care Physician / doctor in mind? (Yes/No)"). The app will then either search by type (if they say No) or ask for their doctor's details (if they say Yes).
 5. **Specialist referral, test, or specialized procedure flow:** When the user says they were **referred to a specialist**, **need to get a test done**, need a **specialized operation**, or need a **specialized procedure**, do the following in order:
    - Get minimal details: ask briefly what type of specialist or procedure (e.g. "What type of specialist or procedure is this for?"). One short question only.
    - Then ask: "What's the estimated amount or cost required for this visit or procedure?" (Ask for the dollar amount.)
@@ -202,5 +202,64 @@ function parseDoctorsFromJson(
       .filter((d) => d.name.length > 0);
   } catch {
     return [];
+  }
+}
+
+/**
+ * Search for doctors by name or clinic (free-text query). Same location restriction as type search.
+ */
+export async function searchDoctorsByDetails(
+  query: string,
+  limit = 8
+): Promise<{ text: string; doctors?: Array<{ name: string; specialty?: string; rating?: number; clinic?: string; location?: string; estimatedVisitCost?: string }> }> {
+  if (!ai) {
+    return { text: "Doctor search is not configured." };
+  }
+
+  const { address, city, zipCode } = DEFAULT_SEARCH_LOCATION;
+  const locationOnly = `${address}, ${city}, TX ${zipCode}`;
+
+  const input = `Search the web for doctors or physicians matching: "${query}" near this location ONLY: ${locationOnly}. They should accept cash payment / self-pay.
+
+Return individual named doctors (e.g. "Dr. [Full Name]") with their specialty, clinic/practice name, and location. Respond with valid JSON only, no other text. Use this structure (up to ${limit} results):
+
+${DOCTOR_JSON_SCHEMA}
+
+Return only the JSON object. No explanation, no code fence, no backticks.`;
+
+  try {
+    let interaction = await ai.interactions.create({
+      model: "gemini-3-flash-preview",
+      input,
+      tools: [{ type: "google_search" as const }],
+    });
+
+    let status = (interaction as { status?: string }).status;
+    const maxWait = 30000;
+    const step = 2000;
+    let waited = 0;
+    while (status === "in_progress" && waited < maxWait) {
+      await new Promise((r) => setTimeout(r, step));
+      waited += step;
+      const got = await ai.interactions.get((interaction as { id: string }).id);
+      interaction = got as typeof interaction;
+      status = (got as { status?: string }).status;
+    }
+
+    const outputs = (interaction as { outputs?: Array<{ type?: string; text?: string }> }).outputs ?? [];
+    const rawText = outputs
+      .filter((o): o is { type: string; text: string } => o?.type === "text" && typeof (o as { text?: string }).text === "string")
+      .map((o) => (o as { text: string }).text)
+      .join("\n\n")
+      .trim();
+
+    const parsed = parseDoctorsFromJson(rawText);
+    return {
+      text: rawText || "No results found for this search.",
+      doctors: parsed.length ? parsed : undefined,
+    };
+  } catch (e) {
+    console.error("Gemini doctor search by details error:", e);
+    return { text: "Search is temporarily unavailable." };
   }
 }

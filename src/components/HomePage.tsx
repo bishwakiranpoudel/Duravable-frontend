@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Menu, ShieldCheck, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import ChatSidebar from "@/components/ChatSidebar";
@@ -8,8 +9,11 @@ import type { ConversationItem } from "@/components/ChatSidebar";
 import ChatInput, { type ChatInputHandle } from "@/components/ChatInput";
 import ChatMessageComponent from "@/components/ChatMessage";
 import TypingIndicator from "@/components/TypingIndicator";
+import DateTimePicker from "@/components/DateTimePicker";
 import type { ChatMessage, Doctor } from "@/lib/mockData";
+import type { CalendarEventPayload } from "@/lib/mockData";
 import { getAuthorizationMessages, normalizeFundsAmount } from "@/lib/mockData";
+import type { AppointmentRecord } from "@/lib/conversation-types";
 
 const INITIAL_ASSISTANT_MESSAGE: ChatMessage = {
   id: "welcome",
@@ -49,6 +53,7 @@ function formatConversationDate(iso: string): string {
 }
 
 export default function HomePage() {
+  const searchParams = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_ASSISTANT_MESSAGE]);
   const [isTyping, setIsTyping] = useState(false);
@@ -59,9 +64,15 @@ export default function HomePage() {
   const [isResumingConversation, setIsResumingConversation] = useState(false);
   const [selectedDoctorInfo, setSelectedDoctorInfo] = useState<{ id: string; name: string; specialty?: string } | null>(null);
   const [fundsAllocated, setFundsAllocated] = useState<string | null>(null);
+  const [waitingForScheduleAnswer, setWaitingForScheduleAnswer] = useState(false);
+  const [showDateTimePicker, setShowDateTimePicker] = useState(false);
+  const [pendingScheduleDoctor, setPendingScheduleDoctor] = useState<Doctor | null>(null);
+  const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const prevTypingRef = useRef(isTyping);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   useEffect(() => {
     if (prevTypingRef.current && !isTyping) {
@@ -87,13 +98,29 @@ export default function HomePage() {
     }
   }, []);
 
-  useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
+  const loadAppointments = useCallback(async () => {
+    try {
+      const res = await fetch("/api/appointments");
+      if (res.ok) {
+        const data = await res.json();
+        setAppointments(data.appointments ?? []);
+      }
+    } catch {
+      setAppointments([]);
+    }
+  }, []);
 
   useEffect(() => {
-    if (sidebarOpen) loadConversations();
-  }, [sidebarOpen, loadConversations]);
+    loadConversations();
+    loadAppointments();
+  }, [loadConversations, loadAppointments]);
+
+  useEffect(() => {
+    if (sidebarOpen) {
+      loadConversations();
+      loadAppointments();
+    }
+  }, [sidebarOpen, loadConversations, loadAppointments]);
 
   const handleResumeConversation = useCallback(async (id: string, fromOngoingPicker = false) => {
     setShowOngoingConversationPicker(false);
@@ -110,12 +137,13 @@ export default function HomePage() {
       }
       const data = await res.json();
       const msgs: ChatMessage[] = (data.messages ?? []).map(
-        (m: { id: string; role: string; content: string; timestamp: string; doctors?: Doctor[] }) => ({
+        (m: { id: string; role: string; content: string; timestamp: string; doctors?: Doctor[]; calendarEvent?: CalendarEventPayload }) => ({
           id: m.id,
           role: m.role as "user" | "assistant" | "system",
           content: m.content,
           timestamp: new Date(m.timestamp),
           ...(m.doctors && { doctors: m.doctors }),
+          ...(m.calendarEvent && { calendarEvent: m.calendarEvent }),
         })
       );
       if (msgs.length === 0) {
@@ -127,6 +155,9 @@ export default function HomePage() {
       setShowQuickActions(false);
       setSelectedDoctorInfo(data.selected_doctor ?? null);
       setFundsAllocated(data.funds_allocated ?? null);
+      setWaitingForScheduleAnswer(false);
+      setShowDateTimePicker(false);
+      setPendingScheduleDoctor(null);
       loadConversations();
     } catch {
       toast.error("Conversation not found or expired.");
@@ -135,6 +166,16 @@ export default function HomePage() {
     }
   }, [conversationId, loadConversations]);
 
+  // Open a specific conversation from URL (e.g. from My Appointments "Go to chat")
+  const conversationFromUrl = searchParams.get("conversation");
+  const lastResumedConversationId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!conversationFromUrl) return;
+    if (lastResumedConversationId.current === conversationFromUrl) return;
+    lastResumedConversationId.current = conversationFromUrl;
+    handleResumeConversation(conversationFromUrl, false);
+  }, [conversationFromUrl, handleResumeConversation]);
+
   const handleNewConversation = useCallback(() => {
     setMessages([INITIAL_ASSISTANT_MESSAGE]);
     setConversationId(null);
@@ -142,7 +183,17 @@ export default function HomePage() {
     setFundsAllocated(null);
     setShowQuickActions(true);
     setShowOngoingConversationPicker(false);
+    setWaitingForScheduleAnswer(false);
+    setShowDateTimePicker(false);
+    setPendingScheduleDoctor(null);
   }, []);
+
+  /** User said "yes" or "no" to scheduling; parse loosely (include "ye", "ya" etc.). */
+  const isScheduleYes = (t: string) => {
+    const s = t.trim().toLowerCase();
+    return s === "y" || s === "ye" || s === "ya" || /\b(yes|yeah|yep|sure|please|yup|ok|okay)\b/i.test(s);
+  };
+  const isScheduleNo = (t: string) => /\b(no|nope|not now|later|skip)\b/i.test(t.trim()) || t.trim().toLowerCase() === "n";
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -158,6 +209,42 @@ export default function HomePage() {
   const handleSend = async (text: string) => {
     setShowQuickActions(false);
     setShowOngoingConversationPicker(false);
+
+    // Intercept: user answering "Should I schedule an appointment?"
+    if (waitingForScheduleAnswer && pendingScheduleDoctor) {
+      setWaitingForScheduleAnswer(false);
+      const userMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: text,
+        timestamp: new Date(),
+      };
+      if (isScheduleYes(text)) {
+        addMessage(userMsg);
+        addMessage({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "When would you like to schedule? Choose a date and time below.",
+          timestamp: new Date(),
+        });
+        setShowDateTimePicker(true);
+        return;
+      }
+      if (isScheduleNo(text)) {
+        addMessage(userMsg);
+        addMessage({
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "No problem. You can schedule anytime from **My Appointments** in the menu. Anything else I can help with?",
+          timestamp: new Date(),
+        });
+        setPendingScheduleDoctor(null);
+        return;
+      }
+      setPendingScheduleDoctor(null);
+      // Fall through to normal chat with same message
+    }
+
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -206,11 +293,13 @@ export default function HomePage() {
       const isOngoingPicker = suggestsConversationPicker(data.message?.content ?? "");
       const showingDoctorsThisTurn = (data.doctors?.length ?? 0) > 0;
       const content = (data.message?.content || "") as string;
+      const messageAsksDoctorInMind = /doctor in mind|in mind\s*[?)]/i.test(content);
+      const askDoctorInMind = data.askDoctorInMind === true || messageAsksDoctorInMind;
       const looksLikeRecommendation =
         /recommend|suggest seeing|you should see a/i.test(content) &&
         /physician|doctor|primary care|specialist|provider/i.test(content);
       const searchType = data.recommendedDoctorType || (looksLikeRecommendation ? "Primary Care Physician" : null);
-      const willSearchDoctors = !isOngoingPicker && !data.doctors?.length && searchType;
+      const willSearchDoctors = !isOngoingPicker && !data.doctors?.length && searchType && !askDoctorInMind;
 
       // If we're about to run a client-side doctor search, keep typing visible and add the assistant message only after search completes.
       if (!willSearchDoctors) {
@@ -242,8 +331,9 @@ export default function HomePage() {
         });
       }
 
-      // Show doctor cards only when we're NOT in the ongoing "pick a conversation" flow.
-      if (!isOngoingPicker) {
+      // Show doctor cards only when we're NOT in the ongoing "pick a conversation" flow
+      // and NOT waiting for "Do you have a doctor in mind? (Yes/No)" — otherwise we'd duplicate the message and search too early.
+      if (!isOngoingPicker && !askDoctorInMind) {
         if (data.doctors?.length) {
           const docMsg: ChatMessage = {
             id: crypto.randomUUID(),
@@ -255,7 +345,6 @@ export default function HomePage() {
           };
           addMessage(docMsg);
         } else if (searchType) {
-          // Keep typing indicator visible while searching, then add assistant message + doctor list together.
           const typeParam = encodeURIComponent(searchType);
           const searchRes = await fetch(`/api/doctors/search?type=${typeParam}`);
           addMessage(assistantMsg);
@@ -281,7 +370,7 @@ export default function HomePage() {
         id: crypto.randomUUID(),
         role: "assistant",
         content:
-          "Something went wrong. Please try again. If the problem continues, check that the assistant is configured (GEMINI_API_KEY).",
+          "Something went wrong. Please try again.",
         timestamp: new Date(),
       });
     } finally {
@@ -294,6 +383,7 @@ export default function HomePage() {
     const selectedDoctorInfoPayload = { id: doctor.id, name: doctor.name, specialty: doctor.specialty };
     setSelectedDoctorInfo(selectedDoctorInfoPayload);
     setFundsAllocated(amount);
+    setPendingScheduleDoctor(doctor);
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -310,6 +400,12 @@ export default function HomePage() {
       id: crypto.randomUUID(),
       timestamp: new Date(),
     }));
+    const schedulePromptMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+        content: `Should I **schedule an appointment** with ${doctor.name}? (Yes/No)`,
+      timestamp: new Date(),
+    };
     let delay = 1200;
 
     authMsgsWithIds.forEach((msg, i) => {
@@ -321,6 +417,7 @@ export default function HomePage() {
             ...messages,
             userMsg,
             ...authMsgsWithIds,
+            schedulePromptMsg,
           ].map((m) => ({
             id: m.id,
             role: m.role,
@@ -337,11 +434,98 @@ export default function HomePage() {
               funds_allocated: amount,
             }),
           }).catch(() => {});
+          setWaitingForScheduleAnswer(true);
         }
       }, delay);
       delay += 1600 + i * 300;
     });
+    setTimeout(() => addMessage(schedulePromptMsg), delay);
   };
+
+  const handleScheduleConfirm = useCallback(
+    async (datetime: Date, doctor: Doctor) => {
+      if (!conversationId) return;
+      try {
+        const res = await fetch("/api/appointments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversation_id: conversationId,
+            doctor_id: doctor.id,
+            doctor_name: doctor.name,
+            doctor_specialty: doctor.specialty,
+            datetime: datetime.toISOString(),
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to create appointment");
+        setShowDateTimePicker(false);
+        setPendingScheduleDoctor(null);
+        loadAppointments();
+
+        const formatted = datetime.toLocaleString(undefined, {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+        const endDatetime = new Date(datetime.getTime() + 30 * 60 * 1000);
+        const toIsoDate = (d: Date) =>
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const toIsoTime = (d: Date) =>
+          `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        const calendarEvent: CalendarEventPayload = {
+          name: `Visit with ${doctor.name}`,
+          startDate: toIsoDate(datetime),
+          startTime: toIsoTime(datetime),
+          endTime: toIsoTime(endDatetime),
+          timeZone: "America/Chicago",
+          description: `DVRABLE health visit with ${doctor.name}${doctor.specialty ? ` (${doctor.specialty})` : ""}. Pay at the office with your health card.`,
+          location: doctor.clinic ?? doctor.location ?? "Cedar Park, TX",
+        };
+        const confirmMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `✅ **Appointment scheduled.** Your visit with **${doctor.name}** is set for **${formatted}**. You can view it in **My Appointments** and add it to your calendar below.`,
+          timestamp: new Date(),
+          calendarEvent,
+        };
+        addMessage(confirmMsg);
+
+        const currentMessages = messagesRef.current;
+        const toStore = [
+          ...currentMessages,
+          {
+            id: crypto.randomUUID(),
+            role: "user" as const,
+            content: `Appointment set for ${formatted}.`,
+            timestamp: new Date(),
+          },
+          confirmMsg,
+        ].map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+          ...("doctors" in m && m.doctors && { doctors: m.doctors }),
+          ...("calendarEvent" in m && m.calendarEvent && { calendarEvent: m.calendarEvent }),
+        }));
+        await fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: toStore,
+            selected_doctor: selectedDoctorInfo,
+            funds_allocated: fundsAllocated,
+          }),
+        });
+      } catch (e) {
+        console.error(e);
+        toast.error("Failed to schedule. Please try again.");
+      }
+    },
+    [conversationId, selectedDoctorInfo, fundsAllocated, loadAppointments]
+  );
 
   return (
     <div className="flex h-[100dvh] w-full overflow-hidden bg-background">
@@ -353,6 +537,7 @@ export default function HomePage() {
         onSelectConversation={(id) => handleResumeConversation(id, false)}
         onNewConversation={handleNewConversation}
         isResuming={isResumingConversation}
+        appointments={appointments}
       />
 
       <div className="flex flex-1 flex-col min-w-0">
@@ -386,9 +571,9 @@ export default function HomePage() {
           style={{ background: "var(--gradient-warm)" }}
         >
           <div className="mx-auto max-w-3xl py-3 sm:py-4">
-            {messages.map((msg) => (
+            {messages.map((msg, idx) => (
               <ChatMessageComponent
-                key={msg.id}
+                key={msg.id ?? `msg-${idx}`}
                 message={msg}
                 onSelectDoctor={handleSelectDoctor}
               />
@@ -427,7 +612,7 @@ export default function HomePage() {
                   {(() => {
                     const otherConversations = conversations.filter((c) => c.conversation_id !== conversationId);
                     return otherConversations.length === 0 ? (
-                      <p className="text-xs text-foreground-tertiary font-body">No past conversations yet. Start a new chat above.</p>
+                      <p className="text-xs text-foreground-tertiary font-body">No other conversations yet. Start a new chat above.</p>
                     ) : (
                       otherConversations.map((c) => (
                       <button
@@ -452,6 +637,17 @@ export default function HomePage() {
               </div>
             )}
 
+            {showDateTimePicker && pendingScheduleDoctor && (
+              <div className="px-3 sm:px-4 py-3">
+                <DateTimePicker
+                  onSelect={(dt) => handleScheduleConfirm(dt, pendingScheduleDoctor)}
+                  onCancel={() => {
+                    setShowDateTimePicker(false);
+                    setPendingScheduleDoctor(null);
+                  }}
+                />
+              </div>
+            )}
             {(isTyping || isResumingConversation) && <TypingIndicator />}
             <div ref={bottomRef} />
           </div>

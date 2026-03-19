@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { chatWithGemini, searchDoctorsWithGemini } from "@/lib/gemini";
+import { chatWithGemini, searchDoctorsWithGemini, searchDoctorsByDetails } from "@/lib/gemini";
 import { parseRecommendedDoctorType, looksLikeDoctorRecommendation } from "@/lib/doctorType";
 import {
   getConversation,
@@ -9,6 +9,38 @@ import {
 import type { ConversationMessage, ConversationMessageDoctor, SelectedDoctorInfo } from "@/lib/conversation-types";
 import { DEFAULT_SEARCH_LOCATION, PAYMENT_MODEL } from "@/lib/constants";
 import { mockDoctors, type Doctor } from "@/lib/mockData";
+
+/** True if message is a "no" to "do you have a doctor in mind?". */
+function isDoctorInMindNo(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  return /\b(no|nope|not really|don't|do not|nah|negative)\b/i.test(t) || t === "n";
+}
+
+/** True if message is a "yes" to "do you have a doctor in mind?". */
+function isDoctorInMindYes(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  return /\b(yes|yeah|yep|sure|i do|please|yup)\b/i.test(t) || t === "y";
+}
+
+/** True if the last assistant message in history asked "doctor in mind". */
+function lastMessageAskedDoctorInMind(messages: { role: string; content: string }[]): boolean {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "assistant") {
+      return /doctor in mind|in mind\s*[?)]/i.test(messages[i].content ?? "");
+    }
+  }
+  return false;
+}
+
+/** Extract specialist type from "Do you have a [Type] / doctor in mind?" in the message. */
+function extractSpecialistFromDoctorInMindQuestion(content: string | undefined): string | null {
+  if (!content?.trim()) return null;
+  const stripped = content.replace(/\*+/g, " ").trim();
+  const match = stripped.match(/do you have a\s+([^/]+?)\s*\/\s*doctor in mind/i);
+  if (!match) return null;
+  const type = match[1].trim().replace(/\s+/g, " ");
+  return type.length > 0 && type.length < 80 ? type : null;
+}
 
 export const maxDuration = 30;
 
@@ -99,6 +131,141 @@ export async function POST(req: NextRequest) {
       }));
 
     const contextRecord = await getConversation(conversationId);
+    const priorMessages: ConversationMessage[] = (messages || []).map(
+      (m: { id: string; role: string; content: string; timestamp: string; doctors?: unknown }) => {
+        const base = { id: m.id, role: m.role as "user" | "assistant" | "system", content: m.content, timestamp: new Date(m.timestamp) };
+        return m.doctors ? { ...base, doctors: m.doctors as ConversationMessageDoctor[] } : base;
+      }
+    );
+
+    const userMsg: ConversationMessage = {
+      id: `msg_${Date.now()}_user`,
+      role: "user",
+      content: userMessage.trim(),
+      timestamp: new Date(),
+    };
+
+    // --- Pending doctor details: user sent name/clinic, search by details and return doctors ---
+    if (contextRecord?.pending_doctor_details) {
+      const doctorType = contextRecord.doctor_recommendation ?? "Primary Care Physician";
+      let doctorsList: ConversationMessageDoctor[];
+      try {
+        const { doctors: parsed } = await searchDoctorsByDetails(userMessage.trim());
+        if (parsed?.length) {
+          doctorsList = parsedToMessageDoctors(parsed, doctorType);
+        } else {
+          doctorsList = mockToMessageDoctors(mockDoctors);
+        }
+      } catch {
+        doctorsList = mockToMessageDoctors(mockDoctors);
+      }
+      const replyContent = "Here are the doctors I found. **Which one is your doctor?** Select below.";
+      const assistantMsg: ConversationMessage = {
+        id: `msg_${Date.now()}_assistant`,
+        role: "assistant",
+        content: replyContent,
+        timestamp: new Date(),
+      };
+      const doctorListMessage: ConversationMessage[] = [
+        {
+          id: `msg_${Date.now()}_doctors`,
+          role: "assistant" as const,
+          content: "Here are doctors near you who accept **cash payment** (Cedar Park, TX 78613):",
+          timestamp: new Date(),
+          doctors: doctorsList,
+        },
+      ];
+      const allMessages: ConversationMessage[] = [
+        ...priorMessages,
+        userMsg,
+        assistantMsg,
+        ...doctorListMessage,
+      ];
+      await setConversation(conversationId, allMessages, {
+        doctor_recommendation: contextRecord.doctor_recommendation ?? null,
+        symptoms: contextRecord.symptoms ?? [],
+        selected_doctor: selectedDoctor ?? contextRecord.selected_doctor ?? null,
+        funds_allocated: fundsAllocated ?? contextRecord.funds_allocated ?? null,
+        pending_doctor_details: false,
+      });
+      return NextResponse.json({
+        conversationId,
+        message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
+        doctors: doctorsList,
+      });
+    }
+
+    // --- Last turn asked "doctor in mind"; this message is Yes/No ---
+    const lastAssistantContent = (() => {
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === "assistant") return history[i].content ?? "";
+      }
+      return "";
+    })();
+    const doctorInMindType =
+      contextRecord?.doctor_recommendation ?? extractSpecialistFromDoctorInMindQuestion(lastAssistantContent);
+    if (lastMessageAskedDoctorInMind(history) && doctorInMindType) {
+      const type = doctorInMindType;
+      if (isDoctorInMindNo(userMessage.trim())) {
+        let doctorsList: ConversationMessageDoctor[];
+        try {
+          const { doctors: parsed } = await searchDoctorsWithGemini(type);
+          doctorsList = parsed?.length ? parsedToMessageDoctors(parsed, type) : mockToMessageDoctors(mockDoctors);
+        } catch {
+          doctorsList = mockToMessageDoctors(mockDoctors);
+        }
+        const replyContent = `Searching for **${type}** who accept cash payment near ${DEFAULT_SEARCH_LOCATION.city}, TX. Here are your results:`;
+        const assistantMsg: ConversationMessage = {
+          id: `msg_${Date.now()}_assistant`,
+          role: "assistant",
+          content: replyContent,
+          timestamp: new Date(),
+        };
+        const doctorListMessage: ConversationMessage[] = [
+          {
+            id: `msg_${Date.now()}_doctors`,
+            role: "assistant" as const,
+            content: "Here are doctors near you who accept **cash payment** (Cedar Park, TX 78613):",
+            timestamp: new Date(),
+            doctors: doctorsList,
+          },
+        ];
+        const allMessages: ConversationMessage[] = [...priorMessages, userMsg, assistantMsg, ...doctorListMessage];
+        await setConversation(conversationId, allMessages, {
+          doctor_recommendation: type,
+          symptoms: contextRecord.symptoms ?? [],
+          selected_doctor: selectedDoctor ?? contextRecord.selected_doctor ?? null,
+          funds_allocated: fundsAllocated ?? contextRecord.funds_allocated ?? null,
+        });
+        return NextResponse.json({
+          conversationId,
+          message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
+          doctors: doctorsList,
+        });
+      }
+      if (isDoctorInMindYes(userMessage.trim())) {
+        const replyContent = "Please share your doctor's **name** or **clinic name** so I can look them up.";
+        const assistantMsg: ConversationMessage = {
+          id: `msg_${Date.now()}_assistant`,
+          role: "assistant",
+          content: replyContent,
+          timestamp: new Date(),
+        };
+        const allMessages: ConversationMessage[] = [...priorMessages, userMsg, assistantMsg];
+        await setConversation(conversationId, allMessages, {
+          doctor_recommendation: type,
+          symptoms: contextRecord.symptoms ?? [],
+          selected_doctor: selectedDoctor ?? contextRecord.selected_doctor ?? null,
+          funds_allocated: fundsAllocated ?? contextRecord.funds_allocated ?? null,
+          pending_doctor_details: true,
+        });
+        return NextResponse.json({
+          conversationId,
+          message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
+        });
+      }
+    }
+
     const contextSummary = contextRecord
       ? [
           contextRecord.symptoms.length && `Symptoms: ${contextRecord.symptoms.join(", ")}`,
@@ -115,8 +282,17 @@ export async function POST(req: NextRequest) {
     );
 
     const recommendedDoctorType = parseRecommendedDoctorType(text);
-    const shouldFetchDoctors = recommendedDoctorType || looksLikeDoctorRecommendation(text);
-    const doctorSearchType = recommendedDoctorType || "Primary Care Physician";
+    const messageAsksDoctorInMind = /doctor in mind|in mind\s*[?)]/i.test(text ?? "");
+    const specialistFromQuestion = extractSpecialistFromDoctorInMindQuestion(text);
+    const resolvedRecommendation =
+      recommendedDoctorType ?? specialistFromQuestion ?? contextRecord?.doctor_recommendation ?? null;
+    const looksLikeRecommendation = recommendedDoctorType || looksLikeDoctorRecommendation(text);
+    // Never fetch when we're asking "Do you have a doctor in mind?" — wait for Yes/No first.
+    const shouldFetchDoctors =
+      !messageAsksDoctorInMind &&
+      !recommendedDoctorType &&
+      looksLikeRecommendation;
+    const doctorSearchType = recommendedDoctorType || specialistFromQuestion || "Primary Care Physician";
     let doctorsList: ConversationMessageDoctor[] | undefined;
 
     if (shouldFetchDoctors) {
@@ -132,12 +308,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const userMsg: ConversationMessage = {
-      id: `msg_${Date.now()}_user`,
-      role: "user",
-      content: userMessage.trim(),
-      timestamp: new Date(),
-    };
     const assistantMsg: ConversationMessage = {
       id: `msg_${Date.now()}_assistant`,
       role: "assistant",
@@ -145,12 +315,6 @@ export async function POST(req: NextRequest) {
       timestamp: new Date(),
     };
 
-    const priorMessages: ConversationMessage[] = (messages || []).map(
-      (m: { id: string; role: string; content: string; timestamp: string; doctors?: unknown }) => {
-        const base = { id: m.id, role: m.role as "user" | "assistant" | "system", content: m.content, timestamp: new Date(m.timestamp) };
-        return m.doctors ? { ...base, doctors: m.doctors as ConversationMessageDoctor[] } : base;
-      }
-    );
     const doctorListMessage: ConversationMessage[] =
       (doctorsList?.length ?? 0) > 0
         ? [
@@ -177,14 +341,12 @@ export async function POST(req: NextRequest) {
         : fundsAllocated ?? contextRecord?.funds_allocated ?? null;
 
     await setConversation(conversationId, allMessages, {
-      doctor_recommendation: recommendedDoctorType ?? contextRecord?.doctor_recommendation ?? null,
+      doctor_recommendation: resolvedRecommendation ?? contextRecord?.doctor_recommendation ?? null,
       symptoms: contextRecord?.symptoms ?? [],
       selected_doctor: selectedDoctor ?? contextRecord?.selected_doctor ?? null,
       funds_allocated: fundsToStore,
     });
 
-    // Only expose amount + allocation steps when this is the specialist/test direct-allocation flow
-    // (user gave amount after we asked in that context), not during normal symptom → doctor flow.
     const showingDoctorsThisTurn = (doctorsList?.length ?? 0) > 0;
     const allocationAckInReply =
       /health card|pay at the office|Durable Health Network|standard.*process|deposit/i.test(text);
@@ -198,6 +360,8 @@ export async function POST(req: NextRequest) {
       message: { id: string; role: "assistant"; content: string; timestamp: Date };
       recommendedDoctorType?: string;
       doctors?: ConversationMessageDoctor[];
+      askDoctorInMind?: boolean;
+      recommendedSpecialist?: string;
       amount?: number;
       isLargeProcedure?: boolean;
       showAllocationSteps?: boolean;
@@ -212,6 +376,11 @@ export async function POST(req: NextRequest) {
       recommendedDoctorType: recommendedDoctorType ?? undefined,
       doctors: doctorsList?.length ? doctorsList : undefined,
     };
+    // Whenever we're asking "doctor in mind?" (parsed type or text), tell frontend not to search — wait for Yes/No.
+    if (recommendedDoctorType || messageAsksDoctorInMind) {
+      responsePayload.askDoctorInMind = true;
+      responsePayload.recommendedSpecialist = (recommendedDoctorType ?? specialistFromQuestion ?? resolvedRecommendation) ?? undefined;
+    }
     if (showAllocationSteps && parsedAmount != null) {
       responsePayload.amount = parsedAmount;
       responsePayload.isLargeProcedure = parsedAmount >= PAYMENT_MODEL.LARGE_PROCEDURE_THRESHOLD_USD;

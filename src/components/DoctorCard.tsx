@@ -56,9 +56,10 @@ export default function DoctorCard({ doctor, onSelect, index }: DoctorCardProps)
       <button
         type="button"
         onClick={() => onSelect(doctor)}
+        aria-label={`Select ${doctor.name} for this visit`}
         className="mt-3 w-full flex items-center justify-center gap-1.5 rounded-xl gradient-trust px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
       >
-        Select Doctor
+        Select doctor
         <ChevronRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
       </button>
     </motion.div>

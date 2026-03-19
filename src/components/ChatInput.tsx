@@ -51,7 +51,7 @@ const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput
               handleSubmit();
             }
           }}
-          placeholder="Describe your symptoms or ask for a doctor..."
+          placeholder="Describe symptoms, find a doctor, or ask a question..."
           disabled={disabled}
           className="flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-foreground placeholder:text-foreground-secondary focus:outline-none disabled:opacity-50 font-body"
         />

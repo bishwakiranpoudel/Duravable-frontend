@@ -34,6 +34,7 @@ export async function GET(
         content: m.content,
         timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
         ...(m.doctors && { doctors: m.doctors }),
+        ...(m.calendarEvent && { calendarEvent: m.calendarEvent }),
       })),
     });
   } catch (e) {
@@ -64,7 +65,7 @@ export async function PUT(
       selected_doctor,
       funds_allocated,
     }: {
-      messages: Array<{ id: string; role: string; content: string; timestamp: string; doctors?: unknown }>;
+      messages: Array<{ id: string; role: string; content: string; timestamp: string; doctors?: unknown; calendarEvent?: unknown }>;
       selected_doctor?: SelectedDoctorInfo | null;
       funds_allocated?: string | null;
     } = body;
@@ -92,6 +93,7 @@ export async function PUT(
         timestamp: new Date(m.timestamp),
       };
       if (m.doctors) out.doctors = m.doctors as ConversationMessage["doctors"];
+      if (m.calendarEvent) out.calendarEvent = m.calendarEvent as ConversationMessage["calendarEvent"];
       return out;
     });
 
