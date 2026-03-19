@@ -25,12 +25,14 @@ export async function POST(req: NextRequest) {
       doctor_name,
       doctor_specialty,
       datetime,
+      appointment_type,
     }: {
       conversation_id: string;
       doctor_id: string;
       doctor_name: string;
       doctor_specialty?: string;
       datetime: string; // ISO
+      appointment_type?: "in_person" | "digital";
     } = body;
 
     if (!conversation_id || !doctor_id || !doctor_name || !datetime) {
@@ -46,6 +48,7 @@ export async function POST(req: NextRequest) {
       doctor_name,
       doctor_specialty,
       datetime,
+      ...(appointment_type && { appointment_type }),
     });
     return NextResponse.json({ appointment: record });
   } catch (e) {

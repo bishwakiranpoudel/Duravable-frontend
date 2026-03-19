@@ -17,6 +17,13 @@ export const DEFAULT_SEARCH_LOCATION = {
   state: "TX",
 };
 
+/** Digital doctor identity used for virtual visits (scheduling, confirmations, labels). */
+export const DIGITAL_DOCTOR = {
+  id: "digital_dr_chen",
+  name: "Dr. Chen",
+  specialty: "Digital Doctor",
+} as const;
+
 export const HEALTH_CARD_MESSAGING = {
   allocation: (amount: string) =>
     `$${amount} has been deposited into your health card for this visit.`,

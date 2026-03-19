@@ -123,30 +123,48 @@ export default function ChatSidebar({
                   {appointments
                     .filter((a) => a.status === "scheduled")
                     .slice(0, 2)
-                    .map((apt, idx) => (
-                      <button
-                        key={apt.id ?? `apt-${idx}`}
-                        type="button"
-                        disabled={isResuming}
-                        onClick={() => {
-                          onSelectConversation(apt.conversation_id);
-                          onClose();
-                        }}
-                        className="flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left hover:bg-sidebar-accent transition-colors group disabled:opacity-60 disabled:pointer-events-none border border-sidebar-border/50"
-                      >
-                        <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[13px] font-medium text-foreground">
-                            {apt.doctor_name}
-                          </p>
-                          <p className="text-[11px] text-foreground-tertiary">
-                            {formatAppointmentDateTime(apt.datetime)}
-                            {apt.doctor_specialty ? ` · ${apt.doctor_specialty}` : ""}
-                          </p>
+                    .map((apt, idx) => {
+                      const isDigital = apt.appointment_type === "digital";
+                      return (
+                        <div
+                          key={apt.id ?? `apt-${idx}`}
+                          className="flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 border border-sidebar-border/50"
+                        >
+                          <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                          <button
+                            type="button"
+                            disabled={isResuming}
+                            onClick={() => {
+                              onSelectConversation(apt.conversation_id);
+                              onClose();
+                            }}
+                            className="min-w-0 flex-1 text-left hover:opacity-80 disabled:opacity-60 disabled:pointer-events-none"
+                          >
+                            <p className="truncate text-[13px] font-medium text-foreground">
+                              {apt.doctor_name}
+                              {isDigital && (
+                                <span className="ml-1 text-[10px] font-normal text-foreground-tertiary">(Digital)</span>
+                              )}
+                            </p>
+                            <p className="text-[11px] text-foreground-tertiary">
+                              {formatAppointmentDateTime(apt.datetime)}
+                              {apt.doctor_specialty && !isDigital ? ` · ${apt.doctor_specialty}` : ""}
+                            </p>
+                          </button>
+                          {isDigital && apt.id ? (
+                            <Link
+                              href={`/digitaldoctor/${apt.id}`}
+                              onClick={onClose}
+                              className="shrink-0 text-[11px] font-medium text-primary hover:underline"
+                            >
+                              Join
+                            </Link>
+                          ) : (
+                            <ChevronRight className="h-4 w-4 shrink-0 text-foreground-tertiary" />
+                          )}
                         </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-foreground-tertiary group-hover:text-primary" />
-                      </button>
-                    ))}
+                      );
+                    })}
                 </div>
                 <Link
                   href="/appointments"

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { CalendarCheck, MessageSquare, ChevronLeft, CalendarX } from "lucide-react";
+import { CalendarCheck, MessageSquare, ChevronLeft, CalendarX, Video } from "lucide-react";
 import type { AppointmentRecord } from "@/lib/conversation-types";
 
 function formatAppointmentDateTime(iso: string) {
@@ -106,38 +106,60 @@ export default function AppointmentsPage() {
                     Upcoming
                   </h2>
                   <ul className="space-y-3">
-                    {upcoming.map((apt) => (
-                      <li key={apt.id}>
-                        <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
-                          <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                              <CalendarCheck className="h-5 w-5" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-foreground">
-                                {apt.doctor_name}
-                              </p>
-                              {apt.doctor_specialty && (
-                                <p className="text-sm text-foreground-secondary mt-0.5">
-                                  {apt.doctor_specialty}
+                    {upcoming.map((apt) => {
+                      const isDigital = apt.appointment_type === "digital";
+                      return (
+                        <li key={apt.id}>
+                          <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                                <CalendarCheck className="h-5 w-5" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-foreground">
+                                  {apt.doctor_name}
+                                  {isDigital && (
+                                    <span className="ml-2 text-xs font-normal text-foreground-secondary">(Digital)</span>
+                                  )}
                                 </p>
-                              )}
-                              <p className="text-sm text-foreground-tertiary mt-1">
-                                {formatAppointmentDateTime(apt.datetime)}
-                              </p>
+                                {apt.doctor_specialty && !isDigital && (
+                                  <p className="text-sm text-foreground-secondary mt-0.5">
+                                    {apt.doctor_specialty}
+                                  </p>
+                                )}
+                                <p className="text-sm text-foreground-tertiary mt-1">
+                                  {formatAppointmentDateTime(apt.datetime)}
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                                {isDigital && apt.id && (
+                                  <Link
+                                    href={`/digitaldoctor/${apt.id}`}
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+                                    aria-label={`Join digital visit with ${apt.doctor_name}`}
+                                  >
+                                    <Video className="h-4 w-4" />
+                                    Join visit
+                                  </Link>
+                                )}
+                                <Link
+                                  href={`/?conversation=${encodeURIComponent(apt.conversation_id)}`}
+                                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                                    isDigital
+                                      ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                      : "bg-primary/10 text-primary hover:bg-primary/20"
+                                  }`}
+                                  aria-label={`Open chat for appointment with ${apt.doctor_name}`}
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                  Open chat
+                                </Link>
+                              </div>
                             </div>
-                            <Link
-                              href={`/?conversation=${encodeURIComponent(apt.conversation_id)}`}
-                              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-primary/10 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-colors"
-                              aria-label={`Open chat for appointment with ${apt.doctor_name}`}
-                            >
-                              <MessageSquare className="h-4 w-4" />
-                              Open chat
-                            </Link>
                           </div>
-                        </div>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </section>
               )}
@@ -148,38 +170,44 @@ export default function AppointmentsPage() {
                     Past
                   </h2>
                   <ul className="space-y-3">
-                    {past.map((apt) => (
-                      <li key={apt.id}>
-                        <div className="rounded-2xl border border-border bg-card/80 p-4 opacity-80">
-                          <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground-tertiary">
-                              <CalendarCheck className="h-5 w-5" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-foreground">
-                                {apt.doctor_name}
-                              </p>
-                              {apt.doctor_specialty && (
-                                <p className="text-sm text-foreground-secondary mt-0.5">
-                                  {apt.doctor_specialty}
+                    {past.map((apt) => {
+                      const isDigital = apt.appointment_type === "digital";
+                      return (
+                        <li key={apt.id}>
+                          <div className="rounded-2xl border border-border bg-card/80 p-4 opacity-80">
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground-tertiary">
+                                <CalendarCheck className="h-5 w-5" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-foreground">
+                                  {apt.doctor_name}
+                                  {isDigital && (
+                                    <span className="ml-2 text-xs font-normal text-foreground-secondary">(Digital)</span>
+                                  )}
                                 </p>
-                              )}
-                              <p className="text-sm text-foreground-tertiary mt-1">
-                                {formatAppointmentDateTime(apt.datetime)}
-                              </p>
+                                {apt.doctor_specialty && !isDigital && (
+                                  <p className="text-sm text-foreground-secondary mt-0.5">
+                                    {apt.doctor_specialty}
+                                  </p>
+                                )}
+                                <p className="text-sm text-foreground-tertiary mt-1">
+                                  {formatAppointmentDateTime(apt.datetime)}
+                                </p>
+                              </div>
+                              <Link
+                                href={`/?conversation=${encodeURIComponent(apt.conversation_id)}`}
+                                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground-secondary hover:bg-muted transition-colors"
+                                aria-label={`Open chat for past appointment with ${apt.doctor_name}`}
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                                Open chat
+                              </Link>
                             </div>
-                            <Link
-                              href={`/?conversation=${encodeURIComponent(apt.conversation_id)}`}
-                              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground-secondary hover:bg-muted transition-colors"
-                              aria-label={`Open chat for past appointment with ${apt.doctor_name}`}
-                            >
-                              <MessageSquare className="h-4 w-4" />
-                              Open chat
-                            </Link>
                           </div>
-                        </div>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </section>
               )}

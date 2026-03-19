@@ -12,8 +12,9 @@ import TypingIndicator from "@/components/TypingIndicator";
 import DateTimePicker from "@/components/DateTimePicker";
 import type { ChatMessage, Doctor } from "@/lib/mockData";
 import type { CalendarEventPayload } from "@/lib/mockData";
-import { getAuthorizationMessages, normalizeFundsAmount } from "@/lib/mockData";
+import { getAuthorizationMessages, normalizeFundsAmount, digitalDoctorPlaceholder } from "@/lib/mockData";
 import type { AppointmentRecord } from "@/lib/conversation-types";
+import { DIGITAL_DOCTOR } from "@/lib/constants";
 
 const INITIAL_ASSISTANT_MESSAGE: ChatMessage = {
   id: "welcome",
@@ -52,6 +53,24 @@ function formatConversationDate(iso: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+/** When showing Digital/In-person chips: remove any broken or truncated "Do you prefer to..." from the bubble, then append the promo line and full question inside the message. */
+const DIGITAL_VS_IN_PERSON_PROMO =
+  "Skip the waiting room. See a digital doctor now or get an in-person appointment.";
+const DIGITAL_VS_IN_PERSON_QUESTION =
+  "Do you prefer to see a digital doctor or an in-person appointment?";
+
+function formatMessageForDigitalVsInPersonChips(content: string): string {
+  if (!content?.trim()) return content;
+  let trimmed = content
+    .replace(/\n\s*Do you prefer to see a digital doctor or an?\s*in-?\s*person appointment\s*\??\s*$/i, "")
+    .replace(/\n\s*Do you prefer to[^\n]*$/i, "")
+    .replace(/\s+Do you prefer to see a digital doctor or an?\s*in-?\s*person appointment\s*\??\s*$/i, "")
+    .replace(/\s+Do you prefer to[^.?!\n]*[.?!]?\s*$/i, "");
+  trimmed = trimmed.trimEnd();
+  if (!trimmed) return content;
+  return `${trimmed}\n\n${DIGITAL_VS_IN_PERSON_PROMO}\n\n**${DIGITAL_VS_IN_PERSON_QUESTION}**`;
+}
+
 export default function HomePage() {
   const searchParams = useSearchParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -67,6 +86,8 @@ export default function HomePage() {
   const [waitingForScheduleAnswer, setWaitingForScheduleAnswer] = useState(false);
   const [showDateTimePicker, setShowDateTimePicker] = useState(false);
   const [pendingScheduleDoctor, setPendingScheduleDoctor] = useState<Doctor | null>(null);
+  const [pendingDigitalAppointment, setPendingDigitalAppointment] = useState(false);
+  const [showDigitalVsInPersonChips, setShowDigitalVsInPersonChips] = useState(false);
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<ChatInputHandle>(null);
@@ -137,13 +158,14 @@ export default function HomePage() {
       }
       const data = await res.json();
       const msgs: ChatMessage[] = (data.messages ?? []).map(
-        (m: { id: string; role: string; content: string; timestamp: string; doctors?: Doctor[]; calendarEvent?: CalendarEventPayload }) => ({
+        (m: { id: string; role: string; content: string; timestamp: string; doctors?: Doctor[]; calendarEvent?: CalendarEventPayload; linkToVisit?: string }) => ({
           id: m.id,
           role: m.role as "user" | "assistant" | "system",
           content: m.content,
           timestamp: new Date(m.timestamp),
           ...(m.doctors && { doctors: m.doctors }),
           ...(m.calendarEvent && { calendarEvent: m.calendarEvent }),
+          ...(m.linkToVisit && { linkToVisit: m.linkToVisit }),
         })
       );
       if (msgs.length === 0) {
@@ -158,6 +180,8 @@ export default function HomePage() {
       setWaitingForScheduleAnswer(false);
       setShowDateTimePicker(false);
       setPendingScheduleDoctor(null);
+      setPendingDigitalAppointment(false);
+      setShowDigitalVsInPersonChips(false);
       loadConversations();
     } catch {
       toast.error("Conversation not found or expired.");
@@ -186,6 +210,8 @@ export default function HomePage() {
     setWaitingForScheduleAnswer(false);
     setShowDateTimePicker(false);
     setPendingScheduleDoctor(null);
+    setPendingDigitalAppointment(false);
+    setShowDigitalVsInPersonChips(false);
   }, []);
 
   /** User said "yes" or "no" to scheduling; parse loosely (include "ye", "ya" etc.). */
@@ -295,15 +321,35 @@ export default function HomePage() {
       const content = (data.message?.content || "") as string;
       const messageAsksDoctorInMind = /doctor in mind|in mind\s*[?)]/i.test(content);
       const askDoctorInMind = data.askDoctorInMind === true || messageAsksDoctorInMind;
+      const looksLikeRecommendationForChips =
+        /recommend|suggest seeing|you should see a/i.test(content) &&
+        /physician|doctor|primary care|specialist|provider/i.test(content);
+      const askDigitalVsInPerson =
+        data.askDigitalVsInPerson === true ||
+        (looksLikeRecommendationForChips && !askDoctorInMind);
+      if (askDigitalVsInPerson) setShowDigitalVsInPersonChips(true);
+      if (askDoctorInMind) setShowDigitalVsInPersonChips(false);
+      if (data.showDigitalScheduler === true) {
+        setShowDateTimePicker(true);
+        setPendingDigitalAppointment(true);
+        setPendingScheduleDoctor(null);
+        setShowDigitalVsInPersonChips(false);
+      }
       const looksLikeRecommendation =
         /recommend|suggest seeing|you should see a/i.test(content) &&
         /physician|doctor|primary care|specialist|provider/i.test(content);
       const searchType = data.recommendedDoctorType || (looksLikeRecommendation ? "Primary Care Physician" : null);
-      const willSearchDoctors = !isOngoingPicker && !data.doctors?.length && searchType && !askDoctorInMind;
+      const willSearchDoctors = !isOngoingPicker && !data.doctors?.length && searchType && !askDoctorInMind && !askDigitalVsInPerson;
+
+      // When showing Digital/In-person chips, show the recommendation plus the full "Do you prefer to see a digital doctor or an in-person appointment?" so the text is complete and the chips are the options.
+      const messageToAdd =
+        askDigitalVsInPerson
+          ? { ...assistantMsg, content: formatMessageForDigitalVsInPersonChips(assistantMsg.content as string) }
+          : assistantMsg;
 
       // If we're about to run a client-side doctor search, keep typing visible and add the assistant message only after search completes.
       if (!willSearchDoctors) {
-        addMessage(assistantMsg);
+        addMessage(messageToAdd);
       }
 
       if (isOngoingPicker) {
@@ -331,9 +377,9 @@ export default function HomePage() {
         });
       }
 
-      // Show doctor cards only when we're NOT in the ongoing "pick a conversation" flow
-      // and NOT waiting for "Do you have a doctor in mind? (Yes/No)" — otherwise we'd duplicate the message and search too early.
-      if (!isOngoingPicker && !askDoctorInMind) {
+      // Show doctor cards only when we're NOT in the ongoing "pick a conversation" flow,
+      // NOT waiting for "Do you have a doctor in mind? (Yes/No)", and NOT showing digital vs in-person chips.
+      if (!isOngoingPicker && !askDoctorInMind && !askDigitalVsInPerson) {
         if (data.doctors?.length) {
           const docMsg: ChatMessage = {
             id: crypto.randomUUID(),
@@ -445,6 +491,7 @@ export default function HomePage() {
   const handleScheduleConfirm = useCallback(
     async (datetime: Date, doctor: Doctor) => {
       if (!conversationId) return;
+      const isDigital = doctor.id === DIGITAL_DOCTOR.id;
       try {
         const res = await fetch("/api/appointments", {
           method: "POST",
@@ -455,11 +502,15 @@ export default function HomePage() {
             doctor_name: doctor.name,
             doctor_specialty: doctor.specialty,
             datetime: datetime.toISOString(),
+            ...(isDigital && { appointment_type: "digital" as const }),
           }),
         });
         if (!res.ok) throw new Error("Failed to create appointment");
+        const data = await res.json();
+        const appointmentId = data?.appointment?.id ?? null;
         setShowDateTimePicker(false);
         setPendingScheduleDoctor(null);
+        setPendingDigitalAppointment(false);
         loadAppointments();
 
         const formatted = datetime.toLocaleString(undefined, {
@@ -480,15 +531,21 @@ export default function HomePage() {
           startTime: toIsoTime(datetime),
           endTime: toIsoTime(endDatetime),
           timeZone: "America/Chicago",
-          description: `DVRABLE health visit with ${doctor.name}${doctor.specialty ? ` (${doctor.specialty})` : ""}. Pay at the office with your health card.`,
-          location: doctor.clinic ?? doctor.location ?? "Cedar Park, TX",
+          description: isDigital
+            ? `DVRABLE digital visit with ${doctor.name}. Join at your scheduled time.`
+            : `DVRABLE health visit with ${doctor.name}${doctor.specialty ? ` (${doctor.specialty})` : ""}. Pay at the office with your health card.`,
+          location: isDigital ? "Digital visit" : (doctor.clinic ?? doctor.location ?? "Cedar Park, TX"),
         };
+        const content = isDigital
+          ? `✅ **Your appointment is set with Dr. Chen**, our digital doctor, for **${formatted}**. You can add it to your calendar below and join your visit when it's time.`
+          : `✅ **Appointment scheduled.** Your visit with **${doctor.name}** is set for **${formatted}**. You can view it in **My Appointments** and add it to your calendar below.`;
         const confirmMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: `✅ **Appointment scheduled.** Your visit with **${doctor.name}** is set for **${formatted}**. You can view it in **My Appointments** and add it to your calendar below.`,
+          content,
           timestamp: new Date(),
           calendarEvent,
+          ...(isDigital && appointmentId && { linkToVisit: `/digitaldoctor/${appointmentId}` }),
         };
         addMessage(confirmMsg);
 
@@ -509,6 +566,7 @@ export default function HomePage() {
           timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
           ...("doctors" in m && m.doctors && { doctors: m.doctors }),
           ...("calendarEvent" in m && m.calendarEvent && { calendarEvent: m.calendarEvent }),
+          ...("linkToVisit" in m && m.linkToVisit && { linkToVisit: m.linkToVisit }),
         }));
         await fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
           method: "PUT",
@@ -637,13 +695,40 @@ export default function HomePage() {
               </div>
             )}
 
-            {showDateTimePicker && pendingScheduleDoctor && (
+            {showDigitalVsInPersonChips && !isTyping && (
+              <div className="px-3 sm:px-4 py-3 sm:py-4">
+                <p className="text-xs font-medium text-foreground-secondary mb-2 sm:mb-2.5 font-body">
+                  Choose an option
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSend("Digital doctor")}
+                    className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[13px] font-medium text-white shadow-card hover:shadow-card-hover hover:border-accent/30 transition-all duration-200"
+                  >
+                    <span>📱</span>
+                    Digital doctor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSend("In-person appointment")}
+                    className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[13px] font-medium text-white shadow-card hover:shadow-card-hover hover:border-accent/30 transition-all duration-200"
+                  >
+                    <span>🏥</span>
+                    In-person appointment
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showDateTimePicker && (pendingScheduleDoctor || pendingDigitalAppointment) && (
               <div className="px-3 sm:px-4 py-3">
                 <DateTimePicker
-                  onSelect={(dt) => handleScheduleConfirm(dt, pendingScheduleDoctor)}
+                  onSelect={(dt) => handleScheduleConfirm(dt, pendingScheduleDoctor ?? digitalDoctorPlaceholder)}
                   onCancel={() => {
                     setShowDateTimePicker(false);
                     setPendingScheduleDoctor(null);
+                    setPendingDigitalAppointment(false);
                   }}
                 />
               </div>

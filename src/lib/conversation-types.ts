@@ -40,6 +40,8 @@ export interface ConversationMessage {
   doctors?: ConversationMessageDoctor[];
   /** Optional calendar event for "Add to calendar" (e.g. after scheduling). */
   calendarEvent?: ConversationCalendarEvent;
+  /** Optional link for digital visit confirmation (e.g. /digitaldoctor/[id]). */
+  linkToVisit?: string;
 }
 
 export interface ConversationContext {
@@ -100,6 +102,8 @@ export interface AppointmentRecord {
   /** scheduled | completed | cancelled */
   status: "scheduled" | "completed" | "cancelled";
   created_at: string; // ISO
+  /** digital = Dr. Chen virtual visit; in_person = physical office (default) */
+  appointment_type?: "in_person" | "digital";
 }
 
 export const DEFAULT_CONTEXT: ConversationContext = {

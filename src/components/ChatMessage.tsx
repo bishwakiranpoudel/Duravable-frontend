@@ -5,7 +5,8 @@ import ReactMarkdown from "react-markdown";
 import DoctorCard from "./DoctorCard";
 import type { ChatMessage as ChatMessageType, Doctor, CalendarEventPayload } from "@/lib/mockData";
 import { motion } from "framer-motion";
-import { ShieldCheck, CircleCheckBig, Bot, CalendarPlus } from "lucide-react";
+import Link from "next/link";
+import { ShieldCheck, CircleCheckBig, Bot, CalendarPlus, Video } from "lucide-react";
 
 const AddToCalendarButton = dynamic(
   () => import("add-to-calendar-button-react").then((mod) => mod.AddToCalendarButton),
@@ -92,6 +93,17 @@ export default function ChatMessageComponent({
                 lightMode="light"
                 styleLight="--btn-background: rgba(255,255,255,0.95); --btn-text: #1a1a1a; --btn-text-hover: #1a1a1a;"
               />
+            </div>
+          )}
+          {!isUser && message.linkToVisit && (
+            <div className="mt-3 pt-3 border-t border-white/20">
+              <Link
+                href={message.linkToVisit}
+                className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-white/25 transition-colors"
+              >
+                <Video className="h-4 w-4" />
+                Join your visit
+              </Link>
             </div>
           )}
         </div>

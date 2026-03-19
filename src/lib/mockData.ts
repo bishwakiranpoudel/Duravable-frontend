@@ -2,7 +2,7 @@
  * Types and mock data. Cash payment primary; no insurance wording in primary flow.
  */
 
-import { PAYMENT_MODEL } from "@/lib/constants";
+import { PAYMENT_MODEL, DIGITAL_DOCTOR } from "@/lib/constants";
 import type { MessageRole } from "@/lib/conversation-types";
 
 export type { MessageRole };
@@ -23,6 +23,20 @@ export interface Doctor {
   /** Estimated cash visit cost (e.g. "100") */
   estimatedVisitCost?: string;
 }
+
+/** Placeholder Doctor object for digital/scheduling flow (Dr. Chen). */
+export const digitalDoctorPlaceholder: Doctor = {
+  id: DIGITAL_DOCTOR.id,
+  name: DIGITAL_DOCTOR.name,
+  specialty: DIGITAL_DOCTOR.specialty,
+  rating: 5,
+  distance: "—",
+  description: "Our digital doctor for virtual visits.",
+  avatar: "DC",
+  available: "Video visit",
+  location: "Digital visit",
+  estimatedVisitCost: "0",
+};
 
 export const mockDoctors: Doctor[] = [
   {
@@ -135,6 +149,8 @@ export interface ChatMessage {
   authorizationStep?: number;
   /** When set, show "Add to calendar" button (e.g. after appointment scheduled). */
   calendarEvent?: CalendarEventPayload;
+  /** When set, show "Join your visit" link (e.g. after digital appointment scheduled). */
+  linkToVisit?: string;
 }
 
 /** Default funds amount when not available or "contact for pricing". */

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { chatWithGemini, searchDoctorsWithGemini, searchDoctorsByDetails } from "@/lib/gemini";
-import { parseRecommendedDoctorType, looksLikeDoctorRecommendation } from "@/lib/doctorType";
+import { parseRecommendedDoctorType, looksLikeDoctorRecommendation, isSpecialistType } from "@/lib/doctorType";
 import {
   getConversation,
   setConversation,
@@ -42,7 +42,87 @@ function extractSpecialistFromDoctorInMindQuestion(content: string | undefined):
   return type.length > 0 && type.length < 80 ? type : null;
 }
 
+/** True if the last assistant message asked "digital doctor or in-person appointment?". */
+function lastMessageAskedDigitalVsInPerson(messages: { role: string; content: string }[]): boolean {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "assistant") {
+      const c = (messages[i].content ?? "").toLowerCase();
+      return (
+        /digital doctor|digital or an?\s*in-?\s*person|in-?\s*person appointment/i.test(c) ||
+        /prefer to see a digital/i.test(c)
+      );
+    }
+  }
+  return false;
+}
+
+/** True if user message indicates they want a digital doctor. */
+function isDigitalChoice(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  return /\bdigital\b/i.test(t) || /digital\s*doctor/i.test(t) || t === "digital";
+}
+
+/** True if user message indicates they want an in-person appointment. */
+function isInPersonChoice(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  return (
+    /\bin\s*person\b/i.test(t) ||
+    /\bin-?\s*person\b/i.test(t) ||
+    /\binperson\b/i.test(t) ||
+    /in-?\s*person\s*appointment/i.test(t) ||
+    /in\s*person\s*appointment/i.test(t)
+  );
+}
+
 export const maxDuration = 30;
+
+/** Max messages (user + assistant) to send to the LLM; keeps recent context without overwhelming. */
+const MAX_CHAT_HISTORY = 14;
+
+/** Build a one-line summary of older messages when we trim history (so the model knows what happened before). */
+function summarizeOlderMessages(messages: { role: string; content: string }[]): string {
+  if (messages.length === 0) return "";
+  const parts: string[] = [];
+  const firstUser = messages.find((m) => m.role === "user");
+  if (firstUser?.content) {
+    const snippet = firstUser.content.slice(0, 80).replace(/\n/g, " ");
+    parts.push(`User reported: ${snippet}${firstUser.content.length > 80 ? "…" : ""}`);
+  }
+  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+  if (lastAssistant?.content) {
+    const snippet = lastAssistant.content.slice(0, 60).replace(/\n/g, " ");
+    parts.push(`Last bot question: ${snippet}${lastAssistant.content.length > 60 ? "…" : ""}`);
+  }
+  return parts.join(". ");
+}
+
+/** Infer phase from history and context; return one short "This turn, you must: ..." instruction so the model knows what to do. */
+function getPhaseInstruction(
+  history: { role: string; content: string }[],
+  contextRecord: { symptoms: string[]; doctor_recommendation: string | null } | null
+): string {
+  let lastAssistantContent = "";
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role === "assistant") {
+      lastAssistantContent = (history[i].content ?? "").trim();
+      break;
+    }
+  }
+
+  const askedNewOrOngoing =
+    /new issue or an?\s*ongoing|is this about a new|ongoing issue/i.test(lastAssistantContent);
+  const hasRecommendation = !!contextRecord?.doctor_recommendation;
+
+  if (history.length <= 1 || askedNewOrOngoing) {
+    return "Ask exactly once: Is this about a new issue or an ongoing issue? If user said ongoing, ask 'Have you discussed this with us before?'. If user said new, ask one relevant symptom question.";
+  }
+
+  if (hasRecommendation) {
+    return "Acknowledge the continuation. Ask how you can help next (e.g. book with the recommended doctor, add symptoms, or check authorization).";
+  }
+
+  return "Ask exactly one follow-up symptom question. If you have enough information to recommend a doctor type, recommend it and ask only: 'Do you prefer to see a digital doctor or an in-person appointment?' Do not ask 'doctor in mind?'.";
+}
 
 /** Parse a dollar amount from user message (e.g. "$6000", "around 5000", "it's $5,000"). Returns null if none found. */
 function parseAmountFromMessage(text: string | undefined): number | null {
@@ -266,26 +346,100 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const contextSummary = contextRecord
-      ? [
-          contextRecord.symptoms.length && `Symptoms: ${contextRecord.symptoms.join(", ")}`,
-          contextRecord.doctor_recommendation &&
-            `Recommended type: ${contextRecord.doctor_recommendation}`,
-        ]
-          .filter(Boolean)
-          .join(". ")
-      : undefined;
+    // --- Last turn asked "digital or in-person?"; this message is the user's choice ---
+    if (lastMessageAskedDigitalVsInPerson(history)) {
+      const type = contextRecord?.doctor_recommendation ?? "Primary Care Physician";
+      if (isInPersonChoice(userMessage.trim())) {
+        const replyContent = `Do you have a **${type}** / doctor in mind? (Yes/No)`;
+        const assistantMsg: ConversationMessage = {
+          id: `msg_${Date.now()}_assistant`,
+          role: "assistant",
+          content: replyContent,
+          timestamp: new Date(),
+        };
+        const allMessages: ConversationMessage[] = [...priorMessages, userMsg, assistantMsg];
+        await setConversation(conversationId, allMessages, {
+          doctor_recommendation: type,
+          symptoms: contextRecord?.symptoms ?? [],
+          selected_doctor: selectedDoctor ?? contextRecord?.selected_doctor ?? null,
+          funds_allocated: fundsAllocated ?? contextRecord?.funds_allocated ?? null,
+        });
+        return NextResponse.json({
+          conversationId,
+          message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
+          askDoctorInMind: true,
+        });
+      }
+      if (isDigitalChoice(userMessage.trim())) {
+        const replyContent =
+          "I'll set you up with our digital doctor. **When would you like to schedule?** Choose a date and time below.";
+        const assistantMsg: ConversationMessage = {
+          id: `msg_${Date.now()}_assistant`,
+          role: "assistant",
+          content: replyContent,
+          timestamp: new Date(),
+        };
+        const allMessages: ConversationMessage[] = [...priorMessages, userMsg, assistantMsg];
+        await setConversation(conversationId, allMessages, {
+          doctor_recommendation: contextRecord?.doctor_recommendation ?? null,
+          symptoms: contextRecord?.symptoms ?? [],
+          selected_doctor: selectedDoctor ?? contextRecord?.selected_doctor ?? null,
+          funds_allocated: fundsAllocated ?? contextRecord?.funds_allocated ?? null,
+        });
+        return NextResponse.json({
+          conversationId,
+          message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
+          showDigitalScheduler: true,
+        });
+      }
+    }
+
+    const trimmedHistory =
+      history.length > MAX_CHAT_HISTORY ? history.slice(-MAX_CHAT_HISTORY) : history;
+    const olderSummary =
+      history.length > MAX_CHAT_HISTORY
+        ? summarizeOlderMessages(history.slice(0, -MAX_CHAT_HISTORY))
+        : "";
+
+    const contextParts: string[] = [];
+    if (contextRecord) {
+      if (contextRecord.symptoms.length)
+        contextParts.push(`Symptoms: ${contextRecord.symptoms.join(", ")}`);
+      if (contextRecord.doctor_recommendation)
+        contextParts.push(`Recommended type: ${contextRecord.doctor_recommendation}`);
+    }
+    if (olderSummary) contextParts.push(`Earlier: ${olderSummary}`);
+    const contextSummary = contextParts.length > 0 ? contextParts.join(". ") : undefined;
+
+    const phaseInstruction = getPhaseInstruction(trimmedHistory, contextRecord);
 
     const { text } = await chatWithGemini(
-      [...history, { role: "user", content: userMessage.trim() }],
-      contextSummary
+      [...trimmedHistory, { role: "user", content: userMessage.trim() }],
+      contextSummary,
+      phaseInstruction
     );
 
     const recommendedDoctorType = parseRecommendedDoctorType(text);
-    const messageAsksDoctorInMind = /doctor in mind|in mind\s*[?)]/i.test(text ?? "");
     const specialistFromQuestion = extractSpecialistFromDoctorInMindQuestion(text);
     const resolvedRecommendation =
       recommendedDoctorType ?? specialistFromQuestion ?? contextRecord?.doctor_recommendation ?? null;
+
+    let responseText = text ?? "";
+    if (resolvedRecommendation && isSpecialistType(resolvedRecommendation) && looksLikeDoctorRecommendation(text ?? "")) {
+      let stripped = (text ?? "")
+        .replace(/\n\s*Do you prefer to see a digital doctor or an?\s*in-?\s*person appointment\s*\??\s*$/i, "")
+        .replace(/\n\s*Do you prefer to[^\n]*$/i, "")
+        .replace(/\s+Do you prefer to see a digital doctor or an?\s*in-?\s*person appointment\s*\??\s*$/i, "")
+        .replace(/\s+Do you prefer to[^.?!\n]*[.?!]?\s*$/i, "")
+        .replace(/\n\s*Do you have a\s+[^?]+\/?\s*doctor in mind\s*\??\s*$/i, "")
+        .replace(/\s+Do you have a\s+[^?]+\/?\s*doctor in mind\s*\??\s*$/i, "");
+      stripped = stripped.trimEnd();
+      responseText = stripped
+        ? `${stripped}\n\nDo you have a **${resolvedRecommendation}** / doctor in mind? (Yes/No)`
+        : `Do you have a **${resolvedRecommendation}** / doctor in mind? (Yes/No)`;
+    }
+
+    const messageAsksDoctorInMind = /doctor in mind|in mind\s*[?)]/i.test(responseText);
     const looksLikeRecommendation = recommendedDoctorType || looksLikeDoctorRecommendation(text);
     // Never fetch when we're asking "Do you have a doctor in mind?" — wait for Yes/No first.
     const shouldFetchDoctors =
@@ -311,7 +465,7 @@ export async function POST(req: NextRequest) {
     const assistantMsg: ConversationMessage = {
       id: `msg_${Date.now()}_assistant`,
       role: "assistant",
-      content: text,
+      content: responseText,
       timestamp: new Date(),
     };
 
@@ -349,11 +503,18 @@ export async function POST(req: NextRequest) {
 
     const showingDoctorsThisTurn = (doctorsList?.length ?? 0) > 0;
     const allocationAckInReply =
-      /health card|pay at the office|Durable Health Network|standard.*process|deposit/i.test(text);
+      /health card|pay at the office|Durable Health Network|standard.*process|deposit/i.test(responseText);
     const showAllocationSteps =
       parsedAmount != null &&
       !showingDoctorsThisTurn &&
       allocationAckInReply;
+
+    const messageExplicitlyAsksDigitalVsInPerson =
+      /digital doctor|digital or an?\s*in-?\s*person|in-?\s*person appointment|prefer to see a digital/i.test(responseText);
+    const isRecommendationWithoutDoctorInMind =
+      (recommendedDoctorType != null || looksLikeDoctorRecommendation(text ?? "")) && !messageAsksDoctorInMind;
+    const messageAsksDigitalVsInPerson =
+      messageExplicitlyAsksDigitalVsInPerson || isRecommendationWithoutDoctorInMind;
 
     const responsePayload: {
       conversationId: string;
@@ -361,6 +522,8 @@ export async function POST(req: NextRequest) {
       recommendedDoctorType?: string;
       doctors?: ConversationMessageDoctor[];
       askDoctorInMind?: boolean;
+      askDigitalVsInPerson?: boolean;
+      showDigitalScheduler?: boolean;
       recommendedSpecialist?: string;
       amount?: number;
       isLargeProcedure?: boolean;
@@ -370,14 +533,18 @@ export async function POST(req: NextRequest) {
       message: {
         id: assistantMsg.id,
         role: "assistant" as const,
-        content: text,
+        content: responseText,
         timestamp: assistantMsg.timestamp,
       },
       recommendedDoctorType: recommendedDoctorType ?? undefined,
       doctors: doctorsList?.length ? doctorsList : undefined,
     };
+    // When asking "digital or in-person?", tell frontend to show the two chips.
+    if (messageAsksDigitalVsInPerson) {
+      responsePayload.askDigitalVsInPerson = true;
+    }
     // Whenever we're asking "doctor in mind?" (parsed type or text), tell frontend not to search — wait for Yes/No.
-    if (recommendedDoctorType || messageAsksDoctorInMind) {
+    if ((recommendedDoctorType || messageAsksDoctorInMind) && !messageAsksDigitalVsInPerson) {
       responsePayload.askDoctorInMind = true;
       responsePayload.recommendedSpecialist = (recommendedDoctorType ?? specialistFromQuestion ?? resolvedRecommendation) ?? undefined;
     }
