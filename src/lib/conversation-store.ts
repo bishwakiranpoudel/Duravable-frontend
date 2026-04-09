@@ -1,15 +1,23 @@
 /**
  * Conversation store: Upstash Redis when UPSTASH_REDIS_REST_URL and
  * UPSTASH_REDIS_REST_TOKEN are set, otherwise in-memory.
- * Same interface for both. Keys: conversation:{id} = JSON, conversation:ids = set of ids.
+ * Data is partitioned by client scope (geo + hashed IP) so each visitor group
+ * only sees their own conversations. See request-scope.ts.
  */
 
 import { Redis } from "@upstash/redis";
 import type { ConversationRecord, ConversationMessage, SelectedDoctorInfo } from "./conversation-types";
 
-const KEY_PREFIX = "conversation:";
-const KEY_IDS = "conversation:ids";
+const CONVERSATION_NS = "conversation:";
 const TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
+
+function dataKey(scopeKey: string, conversationId: string): string {
+  return `${CONVERSATION_NS}${scopeKey}:${conversationId}`;
+}
+
+function idsKey(scopeKey: string): string {
+  return `${CONVERSATION_NS}ids:${scopeKey}`;
+}
 
 let upstashClient: Redis | null = null;
 
@@ -21,7 +29,6 @@ function getUpstash(): Redis | null {
     upstashClient = new Redis({
       url,
       token,
-      // We store JSON strings and deserialize ourselves (message timestamps → Date). Disable so get() returns raw string.
       automaticDeserialization: false,
     });
     console.log("[conversation-store] Using Upstash Redis");
@@ -33,7 +40,17 @@ function getUpstash(): Redis | null {
   return null;
 }
 
-const memoryStore = new Map<string, ConversationRecord>();
+/** scopeKey -> conversationId -> record */
+const memoryByScope = new Map<string, Map<string, ConversationRecord>>();
+
+function getMemoryBucket(scopeKey: string): Map<string, ConversationRecord> {
+  let m = memoryByScope.get(scopeKey);
+  if (!m) {
+    m = new Map();
+    memoryByScope.set(scopeKey, m);
+  }
+  return m;
+}
 
 type RecordMeta = Partial<
   Pick<
@@ -56,7 +73,7 @@ function toRecord(
   meta: RecordMeta = {},
   existing: ConversationRecord | null = null
 ): ConversationRecord {
-  const prev = existing ?? memoryStore.get(conversationId) ?? null;
+  const prev = existing;
   const title =
     meta.title ??
     prev?.title ??
@@ -108,26 +125,28 @@ function deserialize(raw: string | unknown): ConversationRecord | null {
 }
 
 export async function getConversation(
+  scopeKey: string,
   conversationId: string
 ): Promise<ConversationRecord | null> {
   const redis = getUpstash();
   if (redis) {
-    const raw = await redis.get<string>(KEY_PREFIX + conversationId);
+    const raw = await redis.get<string>(dataKey(scopeKey, conversationId));
     if (raw) {
-      console.log("[conversation-store] Read from Redis (Upstash)", { conversationId });
+      console.log("[conversation-store] Read from Redis (Upstash)", { scopeKey, conversationId });
       return deserialize(raw);
     }
     return null;
   }
-  return memoryStore.get(conversationId) ?? null;
+  return getMemoryBucket(scopeKey).get(conversationId) ?? null;
 }
 
 export async function setConversation(
+  scopeKey: string,
   conversationId: string,
   messages: ConversationMessage[],
   meta?: RecordMeta
 ): Promise<void> {
-  const existing = await getConversation(conversationId);
+  const existing = await getConversation(scopeKey, conversationId);
   const record = toRecord(
     conversationId,
     messages,
@@ -145,71 +164,75 @@ export async function setConversation(
     },
     existing
   );
-  // Update timestamp on every save so "Recent chats" reflects last activity
   record.timestamp = new Date().toISOString();
 
   const redis = getUpstash();
   if (redis) {
     console.log("[conversation-store] Writing to Redis (Upstash)", {
+      scopeKey,
       conversationId,
       messageCount: messages.length,
       selected_doctor: record.selected_doctor ?? null,
       funds_allocated: record.funds_allocated ?? null,
     });
-    await redis.set(KEY_PREFIX + conversationId, serialize(record), { ex: TTL_SECONDS });
-    await redis.sadd(KEY_IDS, conversationId);
+    await redis.set(dataKey(scopeKey, conversationId), serialize(record), { ex: TTL_SECONDS });
+    await redis.sadd(idsKey(scopeKey), conversationId);
     return;
   }
-  console.log("[conversation-store] Writing to in-memory store", { conversationId });
-  memoryStore.set(conversationId, record);
+  console.log("[conversation-store] Writing to in-memory store", { scopeKey, conversationId });
+  getMemoryBucket(scopeKey).set(conversationId, record);
 }
 
-/** List conversation ids with title, timestamp, and optional context for resume. */
-export async function listConversations(): Promise<
+/** List conversation ids for this scope only (sorted by activity, newest first). */
+export async function listConversations(scopeKey: string): Promise<
   Array<{ conversation_id: string; timestamp: string; title: string | null; doctor_recommendation?: string | null }>
 > {
   const redis = getUpstash();
   if (redis) {
     let ids: string[] = [];
     try {
-      const rawIds = await redis.smembers(KEY_IDS);
+      const rawIds = await redis.smembers(idsKey(scopeKey));
       ids = Array.isArray(rawIds) ? rawIds.map((id) => String(id)) : [];
     } catch (e) {
       console.warn("[conversation-store] smembers failed, falling back to keys scan", e);
     }
-    // If set is empty (e.g. old data or set never populated), discover via KEYS
+    const prefix = `${CONVERSATION_NS}${scopeKey}:`;
     if (ids.length === 0) {
       try {
-        const keys = await redis.keys(KEY_PREFIX + "*");
+        const keys = await redis.keys(`${prefix}*`);
         const keyList = Array.isArray(keys) ? keys : [];
         for (const key of keyList) {
-          if (key === KEY_IDS) continue;
-          if (key.startsWith(KEY_PREFIX)) {
-            const id = key.slice(KEY_PREFIX.length);
-            if (id) ids.push(id);
-          }
+          if (typeof key !== "string" || !key.startsWith(prefix)) continue;
+          const id = key.slice(prefix.length);
+          if (id) ids.push(id);
         }
       } catch (e) {
         console.warn("[conversation-store] keys scan failed", e);
       }
     }
-    const out: Array<{ conversation_id: string; timestamp: string; title: string | null; doctor_recommendation?: string | null }> = [];
+    const out: Array<{
+      conversation_id: string;
+      timestamp: string;
+      title: string | null;
+      doctor_recommendation?: string | null;
+    }> = [];
     for (const id of ids) {
-      const key = KEY_PREFIX + String(id);
-      const raw = await redis.get<string>(key);
+      const raw = await redis.get<string>(dataKey(scopeKey, String(id)));
       if (!raw) continue;
       const r = deserialize(raw);
-      if (r) out.push({
-        conversation_id: r.conversation_id,
-        timestamp: r.timestamp ?? new Date().toISOString(),
-        title: r.title ?? null,
-        doctor_recommendation: r.doctor_recommendation ?? null,
-      });
+      if (r)
+        out.push({
+          conversation_id: r.conversation_id,
+          timestamp: r.timestamp ?? new Date().toISOString(),
+          title: r.title ?? null,
+          doctor_recommendation: r.doctor_recommendation ?? null,
+        });
     }
     out.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     return out.slice(0, 50);
   }
-  const out = Array.from(memoryStore.entries()).map(([id, r]) => ({
+  const bucket = getMemoryBucket(scopeKey);
+  const out = Array.from(bucket.entries()).map(([id, r]) => ({
     conversation_id: id,
     timestamp: r.timestamp,
     title: r.title ?? null,
@@ -223,13 +246,12 @@ export function generateConversationId(): string {
   return `conv_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 }
 
-/** Delete a conversation by id (e.g. remove temporary "ongoing" chat after user picks one to resume). */
-export async function deleteConversation(conversationId: string): Promise<void> {
+export async function deleteConversation(scopeKey: string, conversationId: string): Promise<void> {
   const redis = getUpstash();
   if (redis) {
-    await redis.del(KEY_PREFIX + conversationId);
-    await redis.srem(KEY_IDS, conversationId);
+    await redis.del(dataKey(scopeKey, conversationId));
+    await redis.srem(idsKey(scopeKey), conversationId);
     return;
   }
-  memoryStore.delete(conversationId);
+  getMemoryBucket(scopeKey).delete(conversationId);
 }

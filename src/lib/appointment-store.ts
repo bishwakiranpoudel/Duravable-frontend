@@ -1,14 +1,21 @@
 /**
- * Appointment store: Upstash Redis (same as conversation-store).
- * Keys: appointment:ids = set of ids, appointment:{id} = JSON.
+ * Appointment store: Upstash Redis (same env as conversation-store).
+ * Partitioned by client scope so "My Appointments" is not global across all users.
  */
 
 import { Redis } from "@upstash/redis";
 import type { AppointmentRecord } from "./conversation-types";
 
-const KEY_PREFIX = "appointment:";
-const KEY_IDS = "appointment:ids";
+const APPOINTMENT_NS = "appointment:";
 const TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
+
+function dataKey(scopeKey: string, id: string): string {
+  return `${APPOINTMENT_NS}${scopeKey}:${id}`;
+}
+
+function idsKey(scopeKey: string): string {
+  return `${APPOINTMENT_NS}ids:${scopeKey}`;
+}
 
 let upstashClient: Redis | null = null;
 
@@ -27,7 +34,16 @@ function getUpstash(): Redis | null {
   return null;
 }
 
-const memoryStore = new Map<string, AppointmentRecord>();
+const memoryByScope = new Map<string, Map<string, AppointmentRecord>>();
+
+function getMemoryBucket(scopeKey: string): Map<string, AppointmentRecord> {
+  let m = memoryByScope.get(scopeKey);
+  if (!m) {
+    m = new Map();
+    memoryByScope.set(scopeKey, m);
+  }
+  return m;
+}
 
 function serialize(record: AppointmentRecord): string {
   return JSON.stringify(record);
@@ -46,6 +62,7 @@ export function generateAppointmentId(): string {
 }
 
 export async function createAppointment(
+  scopeKey: string,
   data: Omit<AppointmentRecord, "id" | "created_at" | "status">
 ): Promise<AppointmentRecord> {
   const id = generateAppointmentId();
@@ -58,24 +75,41 @@ export async function createAppointment(
 
   const redis = getUpstash();
   if (redis) {
-    await redis.set(KEY_PREFIX + id, serialize(record), { ex: TTL_SECONDS });
-    await redis.sadd(KEY_IDS, id);
+    await redis.set(dataKey(scopeKey, id), serialize(record), { ex: TTL_SECONDS });
+    await redis.sadd(idsKey(scopeKey), id);
     return record;
   }
-  memoryStore.set(id, record);
-  const ids = Array.from(memoryStore.keys());
-  if (!ids.includes(id)) memoryStore.set(id, record);
+  getMemoryBucket(scopeKey).set(id, record);
   return record;
 }
 
-export async function listAppointments(): Promise<AppointmentRecord[]> {
+export async function listAppointments(scopeKey: string): Promise<AppointmentRecord[]> {
   const redis = getUpstash();
   if (redis) {
-    const rawIds = await redis.smembers(KEY_IDS);
-    const ids = Array.isArray(rawIds) ? rawIds.map((id) => String(id)) : [];
+    let ids: string[] = [];
+    try {
+      const rawIds = await redis.smembers(idsKey(scopeKey));
+      ids = Array.isArray(rawIds) ? rawIds.map((i) => String(i)) : [];
+    } catch {
+      ids = [];
+    }
+    const prefix = `${APPOINTMENT_NS}${scopeKey}:`;
+    if (ids.length === 0) {
+      try {
+        const keys = await redis.keys(`${prefix}*`);
+        const keyList = Array.isArray(keys) ? keys : [];
+        for (const key of keyList) {
+          if (typeof key !== "string" || !key.startsWith(prefix)) continue;
+          const id = key.slice(prefix.length);
+          if (id) ids.push(id);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     const out: AppointmentRecord[] = [];
     for (const id of ids) {
-      const raw = await redis.get<string>(KEY_PREFIX + id);
+      const raw = await redis.get<string>(dataKey(scopeKey, String(id)));
       if (raw) {
         const r = deserialize(raw);
         if (r) out.push(r);
@@ -84,32 +118,33 @@ export async function listAppointments(): Promise<AppointmentRecord[]> {
     out.sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime());
     return out;
   }
-  const out = Array.from(memoryStore.values());
+  const out = Array.from(getMemoryBucket(scopeKey).values());
   out.sort((a, b) => new Date(b.datetime).getTime() - new Date(a.datetime).getTime());
   return out;
 }
 
-export async function getAppointment(id: string): Promise<AppointmentRecord | null> {
+export async function getAppointment(scopeKey: string, id: string): Promise<AppointmentRecord | null> {
   const redis = getUpstash();
   if (redis) {
-    const raw = await redis.get<string>(KEY_PREFIX + id);
+    const raw = await redis.get<string>(dataKey(scopeKey, id));
     return raw ? deserialize(raw) : null;
   }
-  return memoryStore.get(id) ?? null;
+  return getMemoryBucket(scopeKey).get(id) ?? null;
 }
 
 export async function updateAppointmentStatus(
+  scopeKey: string,
   id: string,
   status: AppointmentRecord["status"]
 ): Promise<AppointmentRecord | null> {
-  const existing = await getAppointment(id);
+  const existing = await getAppointment(scopeKey, id);
   if (!existing) return null;
   const updated: AppointmentRecord = { ...existing, status };
   const redis = getUpstash();
   if (redis) {
-    await redis.set(KEY_PREFIX + id, serialize(updated), { ex: TTL_SECONDS });
+    await redis.set(dataKey(scopeKey, id), serialize(updated), { ex: TTL_SECONDS });
     return updated;
   }
-  memoryStore.set(id, updated);
+  getMemoryBucket(scopeKey).set(id, updated);
   return updated;
 }

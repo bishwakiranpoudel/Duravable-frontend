@@ -2,7 +2,20 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { Menu, ShieldCheck, Wifi } from "lucide-react";
+import {
+  Menu,
+  ShieldCheck,
+  Wifi,
+  Stethoscope,
+  UserRoundSearch,
+  ClipboardList,
+  CirclePlus,
+  RefreshCw,
+  Smartphone,
+  Building2,
+  type LucideIcon,
+} from "lucide-react";
+import { DvrableWordmark, DvrableVMark } from "@/components/Wordmark";
 import { toast } from "sonner";
 import ChatSidebar from "@/components/ChatSidebar";
 import type { ConversationItem } from "@/components/ChatSidebar";
@@ -20,16 +33,16 @@ const INITIAL_ASSISTANT_MESSAGE: ChatMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hello! 👋 I'm **DVRABLE Bot**, your health assistant. I'm here to help you with symptoms, find doctors who accept **cash payment**, and get you set up with your **health card**.\n\n**Is this about a new issue or an ongoing issue?**",
+    "Hello. I'm the **DVRABLE** agent, here to help with symptoms, **cash pay** doctors near you, and your **health card**.\n\n**Is this about a new issue or an ongoing issue?**",
   timestamp: new Date(),
 };
 
-const QUICK_ACTIONS = [
-  { label: "I'm not feeling well", icon: "🩺" },
-  { label: "Find a doctor", icon: "👨‍⚕️" },
-  { label: "I was referred to a specialist", icon: "📋" },
-  { label: "New issue", icon: "✨" },
-  { label: "Ongoing issue", icon: "🔄" },
+const QUICK_ACTIONS: { label: string; Icon: LucideIcon }[] = [
+  { label: "I'm not feeling well", Icon: Stethoscope },
+  { label: "Find a doctor", Icon: UserRoundSearch },
+  { label: "I was referred to a specialist", Icon: ClipboardList },
+  { label: "New issue", Icon: CirclePlus },
+  { label: "Ongoing issue", Icon: RefreshCw },
 ];
 
 /** Assistant message suggests showing "which conversation" picker (ongoing-issue flow). */
@@ -153,7 +166,7 @@ export default function HomePage() {
       }
       const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`);
       if (!res.ok) {
-        toast.error("Conversation not found or expired.");
+        toast.error("Conversation not found or expired.", { duration: Infinity });
         return;
       }
       const data = await res.json();
@@ -169,7 +182,7 @@ export default function HomePage() {
         })
       );
       if (msgs.length === 0) {
-        toast.error("Conversation not found or expired.");
+        toast.error("Conversation not found or expired.", { duration: Infinity });
         return;
       }
       setMessages(msgs);
@@ -184,7 +197,7 @@ export default function HomePage() {
       setShowDigitalVsInPersonChips(false);
       loadConversations();
     } catch {
-      toast.error("Conversation not found or expired.");
+      toast.error("Conversation not found or expired.", { duration: Infinity });
     } finally {
       setIsResumingConversation(false);
     }
@@ -385,7 +398,7 @@ export default function HomePage() {
             id: crypto.randomUUID(),
             role: "assistant",
             content:
-              "Here are doctors near you who accept **cash payment** (Cedar Park, TX 78613):",
+              "Here are doctors near you who accept **cash pay** (Cedar Park, TX 78613):",
             timestamp: new Date(),
             doctors: data.doctors as Doctor[],
           };
@@ -401,7 +414,7 @@ export default function HomePage() {
                 id: crypto.randomUUID(),
                 role: "assistant",
                 content:
-                  "Here are doctors near you who accept **cash payment** (Cedar Park, TX 78613):",
+                  "Here are doctors near you who accept **cash pay** (Cedar Park, TX 78613):",
                 timestamp: new Date(),
                 doctors,
               };
@@ -537,8 +550,8 @@ export default function HomePage() {
           location: isDigital ? "Digital visit" : (doctor.clinic ?? doctor.location ?? "Cedar Park, TX"),
         };
         const content = isDigital
-          ? `✅ **Your appointment is set with Dr. Chen**, our digital doctor, for **${formatted}**. You can add it to your calendar below and join your visit when it's time.`
-          : `✅ **Appointment scheduled.** Your visit with **${doctor.name}** is set for **${formatted}**. You can view it in **My Appointments** and add it to your calendar below.`;
+          ? `**Your appointment is set with Dr. Chen**, our digital doctor, for **${formatted}**. Add it to your calendar below and join when it is time.`
+          : `**Appointment scheduled.** Your visit with **${doctor.name}** is set for **${formatted}**. View it in **My Appointments** and add it to your calendar below.`;
         const confirmMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: "assistant",
@@ -579,7 +592,7 @@ export default function HomePage() {
         });
       } catch (e) {
         console.error(e);
-        toast.error("Failed to schedule. Please try again.");
+        toast.error("Failed to schedule. Please try again.", { duration: Infinity });
       }
     },
     [conversationId, selectedDoctorInfo, fundsAllocated, loadAppointments]
@@ -599,35 +612,50 @@ export default function HomePage() {
       />
 
       <div className="flex flex-1 flex-col min-w-0">
-        <header className="flex items-center gap-2 sm:gap-3 border-b border-border bg-card/80 backdrop-blur-sm px-3 sm:px-4 py-2.5 sm:py-3.5">
+        <header className="flex h-16 shrink-0 items-center gap-2 sm:gap-3 border-b border-[hsl(var(--sand))] bg-white px-3 sm:px-4">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-muted transition-colors md:hidden"
+            className="flex h-9 w-9 items-center justify-center rounded-[4px] hover:bg-[hsl(var(--cream))] transition-colors md:hidden"
             aria-label="Open menu"
           >
-            <Menu className="h-5 w-5 text-foreground" />
+            <Menu className="h-6 w-6 text-[hsl(var(--charcoal))]" strokeWidth={1.5} />
           </button>
+          <div className="sm:hidden flex items-center" aria-hidden>
+            <DvrableVMark size="lg" />
+          </div>
+          <div className="hidden min-w-0 sm:flex sm:flex-col sm:justify-center">
+            <DvrableWordmark variant="light" className="leading-none" />
+            <p className="text-[10px] sm:text-[11px] text-[hsl(var(--warm-stone))] font-body mt-0.5 hidden md:block">
+              The Agent-First Health System
+            </p>
+          </div>
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-            <div className="hidden md:flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1">
-              <ShieldCheck className="h-3 w-3 text-secondary-foreground" />
-              <span className="text-[11px] font-medium text-secondary-foreground">
+            <div className="hidden md:flex items-center gap-1.5 border border-[hsl(var(--sand))] rounded-[4px] px-3 py-1.5 bg-white">
+              <ShieldCheck className="h-3.5 w-3.5 text-[hsl(var(--charcoal))]" strokeWidth={1.5} />
+              <span className="text-[11px] font-display font-semibold text-[hsl(var(--charcoal))]">
                 HIPAA Compliant
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <Wifi className="h-3 w-3 text-chat-success" />
-              <span className="text-[11px] text-foreground-tertiary font-body">
+              <Wifi className="h-3.5 w-3.5 text-[hsl(var(--teal))]" strokeWidth={1.5} />
+              <span className="text-[11px] text-[hsl(var(--warm-stone))] font-body">
                 Online
               </span>
             </div>
           </div>
         </header>
 
-        <div
-          className="flex-1 overflow-y-auto scrollbar-thin"
-          style={{ background: "var(--gradient-warm)" }}
-        >
+        {(isTyping || isResumingConversation) && (
+          <div
+            className="h-0.5 w-full shrink-0 bg-[hsl(var(--sand))] overflow-hidden relative"
+            aria-hidden
+          >
+            <div className="absolute inset-y-0 left-0 w-1/3 bg-[hsl(var(--copper))] nav-progress-indeterminate" />
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto scrollbar-thin bg-white">
           <div className="mx-auto max-w-3xl py-3 sm:py-4">
             {messages.map((msg, idx) => (
               <ChatMessageComponent
@@ -639,19 +667,19 @@ export default function HomePage() {
 
             {showQuickActions && !isTyping && (
               <div className="px-3 sm:px-4 py-3 sm:py-4">
-                <p className="text-xs font-medium text-foreground-secondary mb-2 sm:mb-2.5 font-body">
+                <p className="text-xs font-display font-semibold text-[hsl(var(--warm-stone))] mb-2 sm:mb-2.5">
                   Quick actions
                 </p>
                 <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-                  {QUICK_ACTIONS.map((action) => (
+                  {QUICK_ACTIONS.map(({ label, Icon }) => (
                     <button
-                      key={action.label}
+                      key={label}
                       type="button"
-                      onClick={() => handleSend(action.label)}
-                      className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 rounded-xl border border-border bg-card px-3 sm:px-4 py-2.5 text-[13px] sm:text-sm font-medium text-white shadow-card hover:shadow-card-hover hover:border-accent/30 transition-all duration-200 font-body"
+                      onClick={() => handleSend(label)}
+                      className="flex items-center justify-center sm:justify-start gap-1.5 sm:gap-2 rounded-[4px] border border-[hsl(var(--sand))] bg-white px-3 sm:px-4 py-2.5 text-[13px] sm:text-sm font-body font-medium text-[hsl(var(--charcoal))] shadow-card hover:shadow-card-hover hover:border-[hsl(var(--copper))]/50 transition-all duration-200"
                     >
-                      <span>{action.icon}</span>
-                      <span className="truncate">{action.label}</span>
+                      <Icon className="h-4 w-4 shrink-0 text-[hsl(var(--charcoal))]" strokeWidth={1.5} />
+                      <span className="truncate">{label}</span>
                     </button>
                   ))}
                 </div>
@@ -660,29 +688,31 @@ export default function HomePage() {
 
             {showOngoingConversationPicker && !isTyping && (
               <div className="px-3 sm:px-4 py-3 sm:py-4">
-                <p className="text-xs font-medium text-foreground-secondary mb-2 sm:mb-2.5 font-body">
+                <p className="text-xs font-display font-semibold text-[hsl(var(--warm-stone))] mb-2 sm:mb-2.5">
                   Continue a conversation
                 </p>
-                <p className="text-[11px] text-foreground-tertiary mb-3 font-body">
+                <p className="text-[11px] text-[hsl(var(--warm-stone))] mb-3 font-body">
                   Tap one to pick up where you left off (symptoms, doctor, funds).
                 </p>
                 <div className="space-y-2">
                   {(() => {
                     const otherConversations = conversations.filter((c) => c.conversation_id !== conversationId);
                     return otherConversations.length === 0 ? (
-                      <p className="text-xs text-foreground-tertiary font-body">No other conversations yet. Start a new chat above.</p>
+                      <p className="text-xs text-[hsl(var(--warm-stone))] font-body">
+                        No other conversations yet. Start a new chat above.
+                      </p>
                     ) : (
                       otherConversations.map((c) => (
                       <button
                         key={c.conversation_id}
                         type="button"
                         onClick={() => handleResumeConversation(c.conversation_id, true)}
-                        className="flex w-full flex-col items-start gap-0.5 rounded-xl border border-border bg-card px-3 py-2.5 text-left shadow-card hover:shadow-card-hover hover:border-accent/30 transition-all duration-200"
+                        className="flex w-full flex-col items-start gap-0.5 rounded-[4px] border border-[hsl(var(--sand))] bg-white px-3 py-2.5 text-left shadow-card hover:shadow-card-hover hover:border-[hsl(var(--copper))]/40 transition-all duration-200"
                       >
-                        <span className="text-[13px] font-medium text-white truncate w-full">
+                        <span className="text-[13px] font-display font-semibold text-[hsl(var(--charcoal))] truncate w-full">
                           {c.title || "Conversation"}
                         </span>
-                        <span className="text-[11px] text-foreground-tertiary">
+                        <span className="text-[11px] text-[hsl(var(--warm-stone))] font-body">
                           {c.doctor_recommendation
                             ? `${formatConversationDate(c.timestamp)} · ${c.doctor_recommendation}`
                             : formatConversationDate(c.timestamp)}
@@ -697,24 +727,24 @@ export default function HomePage() {
 
             {showDigitalVsInPersonChips && !isTyping && (
               <div className="px-3 sm:px-4 py-3 sm:py-4">
-                <p className="text-xs font-medium text-foreground-secondary mb-2 sm:mb-2.5 font-body">
+                <p className="text-xs font-display font-semibold text-[hsl(var(--warm-stone))] mb-2 sm:mb-2.5">
                   Choose an option
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => handleSend("Digital doctor")}
-                    className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[13px] font-medium text-white shadow-card hover:shadow-card-hover hover:border-accent/30 transition-all duration-200"
+                    className="flex items-center gap-2 rounded-[4px] border border-[hsl(var(--sand))] bg-white px-4 py-2.5 text-[13px] font-body font-medium text-[hsl(var(--charcoal))] shadow-card hover:border-[hsl(var(--copper))]/40 transition-all duration-200"
                   >
-                    <span>📱</span>
+                    <Smartphone className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                     Digital doctor
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSend("In-person appointment")}
-                    className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-[13px] font-medium text-white shadow-card hover:shadow-card-hover hover:border-accent/30 transition-all duration-200"
+                    className="flex items-center gap-2 rounded-[4px] border border-[hsl(var(--sand))] bg-white px-4 py-2.5 text-[13px] font-body font-medium text-[hsl(var(--charcoal))] shadow-card hover:border-[hsl(var(--copper))]/40 transition-all duration-200"
                   >
-                    <span>🏥</span>
+                    <Building2 className="h-4 w-4 shrink-0" strokeWidth={1.5} />
                     In-person appointment
                   </button>
                 </div>

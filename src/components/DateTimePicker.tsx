@@ -43,11 +43,13 @@ export default function DateTimePicker({ onSelect, onCancel, minDate }: DateTime
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const days = getNextDays(14);
-  const minDateNorm = minDate ? (() => {
-    const m = new Date(minDate);
-    m.setHours(0, 0, 0, 0);
-    return m;
-  })() : null;
+  const minDateNorm = minDate
+    ? (() => {
+        const m = new Date(minDate);
+        m.setHours(0, 0, 0, 0);
+        return m;
+      })()
+    : null;
 
   const handleConfirm = () => {
     if (!selectedDate || !selectedTime) return;
@@ -63,46 +65,48 @@ export default function DateTimePicker({ onSelect, onCancel, minDate }: DateTime
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-card"
+      className="rounded-[4px] border border-[hsl(var(--sand))] bg-white p-4 sm:p-5 shadow-card"
     >
       <div className="flex items-center gap-2 mb-3">
-        <Calendar className="h-4 w-4 text-primary" />
-        <span className="text-sm font-semibold text-foreground">Choose date and time</span>
+        <Calendar className="h-4 w-4 text-[hsl(var(--copper))]" strokeWidth={1.5} />
+        <span className="text-sm font-display font-bold text-[hsl(var(--charcoal))]">
+          Choose date and time
+        </span>
       </div>
 
-        <div className="mb-4">
-        <p className="text-xs font-medium text-foreground-secondary mb-2">Date</p>
+      <div className="mb-4">
+        <p className="text-xs font-display font-semibold text-[hsl(var(--warm-stone))] mb-2">Date</p>
         <div className="flex flex-wrap gap-2">
           {days.map((d) => {
-              const dNorm = new Date(d);
-              dNorm.setHours(0, 0, 0, 0);
-              const disabled = minDateNorm ? dNorm < minDateNorm : false;
-              const isSelected = selectedDate?.toDateString() === d.toDateString();
-              const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-              return (
-                <button
-                  key={dayKey}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => setSelectedDate(d)}
-                  className={`rounded-xl px-3 py-2 text-[13px] font-medium transition-all ${
-                    disabled
-                      ? "opacity-50 cursor-not-allowed bg-muted text-muted-foreground"
-                      : isSelected
-                        ? "bg-primary text-primary-foreground ring-2 ring-primary/50"
-                        : "bg-muted/80 text-foreground hover:bg-muted"
-                  }`}
-                >
-                  {formatDateLabel(d)}
-                </button>
-              );
-            })}
+            const dNorm = new Date(d);
+            dNorm.setHours(0, 0, 0, 0);
+            const disabled = minDateNorm ? dNorm < minDateNorm : false;
+            const isSelected = selectedDate?.toDateString() === d.toDateString();
+            const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+            return (
+              <button
+                key={dayKey}
+                type="button"
+                disabled={disabled}
+                onClick={() => setSelectedDate(d)}
+                className={`rounded-[4px] px-3 py-2 text-[13px] font-body font-medium transition-all ${
+                  disabled
+                    ? "opacity-50 cursor-not-allowed bg-[hsl(var(--cream))] text-[hsl(var(--sand))]"
+                    : isSelected
+                      ? "bg-[hsl(var(--copper))] text-white ring-2 ring-[hsl(var(--copper))]/40"
+                      : "bg-[hsl(var(--cream))] text-[hsl(var(--charcoal))] hover:bg-[hsl(var(--sand))]/30"
+                }`}
+              >
+                {formatDateLabel(d)}
+              </button>
+            );
+          })}
         </div>
       </div>
 
       <div className="mb-4">
-        <p className="text-xs font-medium text-foreground-secondary mb-2 flex items-center gap-1">
-          <Clock className="h-3.5 w-3" /> Time
+        <p className="text-xs font-display font-semibold text-[hsl(var(--warm-stone))] mb-2 flex items-center gap-1">
+          <Clock className="h-3.5 w-3" strokeWidth={1.5} /> Time
         </p>
         <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
           {TIME_SLOTS.map((slot) => {
@@ -112,10 +116,10 @@ export default function DateTimePicker({ onSelect, onCancel, minDate }: DateTime
                 key={slot}
                 type="button"
                 onClick={() => setSelectedTime(slot)}
-                className={`rounded-lg px-2 py-2 text-[12px] font-medium transition-all ${
+                className={`rounded-[4px] px-2 py-2 text-[12px] font-body font-medium transition-all ${
                   isSelected
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/80 text-foreground hover:bg-muted"
+                    ? "bg-[hsl(var(--copper))] text-white"
+                    : "bg-[hsl(var(--cream))] text-[hsl(var(--charcoal))] hover:bg-[hsl(var(--sand))]/30"
                 }`}
               >
                 {slot}
@@ -129,7 +133,7 @@ export default function DateTimePicker({ onSelect, onCancel, minDate }: DateTime
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-xl px-4 py-2 text-sm font-medium text-foreground-secondary hover:bg-muted transition-colors"
+          className="rounded-[4px] border border-[hsl(var(--copper))] bg-white px-4 py-2 text-sm font-body font-medium text-[hsl(var(--copper))] hover:bg-[hsl(var(--cream))] transition-colors"
         >
           Cancel
         </button>
@@ -137,7 +141,7 @@ export default function DateTimePicker({ onSelect, onCancel, minDate }: DateTime
           type="button"
           onClick={handleConfirm}
           disabled={!canConfirm}
-          className="rounded-xl px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+          className="rounded-[4px] px-4 py-2 text-sm font-display font-bold bg-[hsl(var(--copper))] text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
         >
           Confirm
         </button>

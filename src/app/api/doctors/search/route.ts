@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
           name: d.name.startsWith("Dr.") ? d.name : `Dr. ${d.name}`,
           specialty: d.specialty ?? doctorType,
           rating: d.rating ?? 4.5,
-          distance: "—",
+          distance: "N/A",
           description: d.clinic ? `${d.clinic}${d.location ? ` · ${d.location}` : ""}` : "Accepting cash payment.",
           avatar: d.name.replace(/\b(\w)\w*\s+(\w)\w*/, "$1$2").slice(0, 2).toUpperCase() || "DR",
           available: "Contact for availability",

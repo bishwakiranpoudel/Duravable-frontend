@@ -30,7 +30,7 @@ export const digitalDoctorPlaceholder: Doctor = {
   name: DIGITAL_DOCTOR.name,
   specialty: DIGITAL_DOCTOR.specialty,
   rating: 5,
-  distance: "—",
+  distance: "N/A",
   description: "Our digital doctor for virtual visits.",
   avatar: "DC",
   available: "Video visit",
@@ -111,7 +111,7 @@ export const mockConversations: ConversationPreview[] = [
   },
 ];
 
-/** User profile: health card and member id for cash/authorization flow. No insurance plan/copay/deductible in primary flow. */
+/** User profile: health card and plan participant ID for cash/authorization flow. No insurance plan/copay/deductible in primary flow. */
 export interface UserProfile {
   name: string;
   memberId: string;
@@ -160,7 +160,7 @@ const DEFAULT_FUNDS_USD = "100";
 export function normalizeFundsAmount(value: string | undefined): string {
   if (!value || !value.trim()) return DEFAULT_FUNDS_USD;
   const lower = value.toLowerCase().trim();
-  if (lower.includes("contact") || lower === "—" || lower === "-") return DEFAULT_FUNDS_USD;
+  if (lower.includes("contact") || lower === "—" || lower === "n/a" || lower === "-") return DEFAULT_FUNDS_USD;
   const num = parseFloat(value.replace(/[^0-9.]/g, ""));
   return !Number.isNaN(num) && num > 0 ? String(Math.round(num)) : DEFAULT_FUNDS_USD;
 }
@@ -176,19 +176,19 @@ export function getAuthorizationMessages(amount = DEFAULT_FUNDS_USD): Omit<ChatM
   return [
     {
       role: "assistant",
-      content: "🔄 **Checking availability** and preparing your visit...",
+      content: "**Checking availability** and preparing your visit.",
       timestamp: new Date(),
       authorizationStep: 1,
     },
     {
       role: "assistant",
-      content: "✅ **Authorization granted.**",
+      content: "**Authorization granted.**",
       timestamp: new Date(),
       authorizationStep: 2,
     },
     {
       role: "assistant",
-      content: `📋 **Funds allocated.** $${amount} has been deposited into your health card for this visit. You're all set—pay at the office with your health card.${networkNote}\n\n**Summary:**\n- Provider confirmed\n- Estimated visit cost: $${amount} (cash payment)\n\nAnything else I can help with?`,
+      content: `**Funds allocated.** $${amount} has been deposited into your health card for this visit. You are all set. Pay at the office with your health card.${networkNote}\n\n**Summary:**\n- Provider confirmed\n- Estimated visit cost: $${amount} (cash pay)\n\nAnything else I can help with?`,
       timestamp: new Date(),
       authorizationStep: 3,
     },

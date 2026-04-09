@@ -1,63 +1,69 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getConversation, deleteConversation, setConversation } from "@/lib/conversation-store";
 import type { ConversationMessage, SelectedDoctorInfo } from "@/lib/conversation-types";
+import { getClientScope, attachScopeHeaders } from "@/lib/request-scope";
 
-/** GET: load a conversation by id for resume (returns messages + metadata). */
+/** GET: load a conversation for this client scope only. */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const scope = getClientScope(req);
   try {
     const { id } = await params;
     if (!id) {
-      return NextResponse.json(
-        { error: "Conversation id is required" },
-        { status: 400 }
+      return attachScopeHeaders(
+        NextResponse.json({ error: "Conversation id is required" }, { status: 400 }),
+        scope
       );
     }
-    const record = await getConversation(id);
+    const record = await getConversation(scope.key, id);
     if (!record) {
-      return NextResponse.json(
-        { error: "Conversation not found" },
-        { status: 404 }
+      return attachScopeHeaders(
+        NextResponse.json({ error: "Conversation not found" }, { status: 404 }),
+        scope
       );
     }
-    return NextResponse.json({
-      conversation_id: record.conversation_id,
-      title: record.title,
-      timestamp: record.timestamp,
-      selected_doctor: record.selected_doctor ?? null,
-      funds_allocated: record.funds_allocated ?? null,
-      messages: record.messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
-        ...(m.doctors && { doctors: m.doctors }),
-        ...(m.calendarEvent && { calendarEvent: m.calendarEvent }),
-        ...(m.linkToVisit && { linkToVisit: m.linkToVisit }),
-      })),
-    });
+    return attachScopeHeaders(
+      NextResponse.json({
+        conversation_id: record.conversation_id,
+        title: record.title,
+        timestamp: record.timestamp,
+        selected_doctor: record.selected_doctor ?? null,
+        funds_allocated: record.funds_allocated ?? null,
+        messages: record.messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+          ...(m.doctors && { doctors: m.doctors }),
+          ...(m.calendarEvent && { calendarEvent: m.calendarEvent }),
+          ...(m.linkToVisit && { linkToVisit: m.linkToVisit }),
+        })),
+      }),
+      scope
+    );
   } catch (e) {
     console.error("GET /api/conversations/[id] error:", e);
-    return NextResponse.json(
-      { error: "Failed to load conversation" },
-      { status: 500 }
+    return attachScopeHeaders(
+      NextResponse.json({ error: "Failed to load conversation" }, { status: 500 }),
+      scope
     );
   }
 }
 
-/** PUT: update conversation with messages and optional meta (e.g. after doctor selection + auth steps). */
+/** PUT: update conversation within this client scope. */
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const scope = getClientScope(req);
   try {
     const { id } = await params;
     if (!id) {
-      return NextResponse.json(
-        { error: "Conversation id is required" },
-        { status: 400 }
+      return attachScopeHeaders(
+        NextResponse.json({ error: "Conversation id is required" }, { status: 400 }),
+        scope
       );
     }
     const body = await req.json();
@@ -72,17 +78,20 @@ export async function PUT(
     } = body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json(
-        { error: "messages array is required and must not be empty" },
-        { status: 400 }
+      return attachScopeHeaders(
+        NextResponse.json(
+          { error: "messages array is required and must not be empty" },
+          { status: 400 }
+        ),
+        scope
       );
     }
 
-    const existing = await getConversation(id);
+    const existing = await getConversation(scope.key, id);
     if (!existing) {
-      return NextResponse.json(
-        { error: "Conversation not found" },
-        { status: 404 }
+      return attachScopeHeaders(
+        NextResponse.json({ error: "Conversation not found" }, { status: 404 }),
+        scope
       );
     }
 
@@ -99,43 +108,44 @@ export async function PUT(
       return out;
     });
 
-    await setConversation(id, conversationMessages, {
+    await setConversation(scope.key, id, conversationMessages, {
       doctor_recommendation: existing.doctor_recommendation ?? null,
       symptoms: existing.symptoms ?? [],
       selected_doctor: selected_doctor ?? existing.selected_doctor ?? null,
       funds_allocated: funds_allocated ?? existing.funds_allocated ?? null,
     });
 
-    return NextResponse.json({ ok: true });
+    return attachScopeHeaders(NextResponse.json({ ok: true }), scope);
   } catch (e) {
     console.error("PUT /api/conversations/[id] error:", e);
-    return NextResponse.json(
-      { error: "Failed to update conversation" },
-      { status: 500 }
+    return attachScopeHeaders(
+      NextResponse.json({ error: "Failed to update conversation" }, { status: 500 }),
+      scope
     );
   }
 }
 
-/** DELETE: remove a conversation (e.g. temporary "ongoing" chat after user resumes another). */
+/** DELETE: remove a conversation in this scope. */
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const scope = getClientScope(req);
   try {
     const { id } = await params;
     if (!id) {
-      return NextResponse.json(
-        { error: "Conversation id is required" },
-        { status: 400 }
+      return attachScopeHeaders(
+        NextResponse.json({ error: "Conversation id is required" }, { status: 400 }),
+        scope
       );
     }
-    await deleteConversation(id);
-    return NextResponse.json({ ok: true });
+    await deleteConversation(scope.key, id);
+    return attachScopeHeaders(NextResponse.json({ ok: true }), scope);
   } catch (e) {
     console.error("DELETE /api/conversations/[id] error:", e);
-    return NextResponse.json(
-      { error: "Failed to delete conversation" },
-      { status: 500 }
+    return attachScopeHeaders(
+      NextResponse.json({ error: "Failed to delete conversation" }, { status: 500 }),
+      scope
     );
   }
 }

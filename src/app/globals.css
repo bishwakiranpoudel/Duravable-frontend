@@ -2,73 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&display=swap");
+/* DVRABLE Brand Guide v4.1 — Georgia + EB Garamond via next/font in layout */
 
 @layer base {
   :root {
-    --background: 0 0% 10%;
-    --foreground: 0 0% 100%;
-    --foreground-secondary: 30 16% 66%;
-    --foreground-tertiary: 216 11% 65%;
+    /* Brand primitives (HSL channels for hsl(var(--token))) */
+    --charcoal: 215 28% 17%;
+    --copper: 28 57% 46%;
+    --warm-stone: 28 13% 48%;
+    --cream: 30 33% 94%;
+    --sand: 30 17% 66%;
+    --teal: 172 87% 29%;
+    --brand-success: 153 40% 30%;
+    --brand-warning: 30 100% 40%;
+    --brand-error: 0 100% 40%;
+    --navy: 218 48% 20%;
 
-    --card: 0 0% 16%;
-    --card-foreground: 0 0% 100%;
+    /* Light mode (default) — software mapping */
+    --background: 0 0% 100%;
+    --foreground: var(--charcoal);
+    --foreground-secondary: var(--warm-stone);
+    --foreground-tertiary: var(--sand);
 
-    --popover: 0 0% 14%;
-    --popover-foreground: 0 0% 100%;
+    --card: var(--cream);
+    --card-foreground: var(--charcoal);
 
-    --primary: 36 36% 53%;
+    --popover: 0 0% 100%;
+    --popover-foreground: var(--charcoal);
+
+    --primary: var(--copper);
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 36 25% 35%;
-    --secondary-foreground: 30 16% 66%;
+    --secondary: 0 0% 100%;
+    --secondary-foreground: var(--copper);
 
-    --muted: 0 0% 18%;
-    --muted-foreground: 216 11% 65%;
+    --muted: var(--cream);
+    --muted-foreground: var(--warm-stone);
 
-    --accent: 172 50% 38%;
+    --accent: var(--teal);
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 65% 52%;
+    --destructive: var(--brand-error);
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 22%;
-    --input: 0 0% 22%;
-    --ring: 36 36% 53%;
+    --border: var(--sand);
+    --input: var(--sand);
+    --ring: var(--copper);
 
-    --radius: 0.875rem;
+    --radius: 0.5rem;
 
-    --chat-user: 36 36% 53%;
+    --chat-user: var(--copper);
     --chat-user-foreground: 0 0% 100%;
-    --chat-ai: 0 0% 16%;
-    --chat-ai-foreground: 0 0% 100%;
-    --chat-success: 158 55% 38%;
-    --chat-warning: 38 92% 55%;
-    --chat-ai-border: 0 0% 28%;
+    --chat-ai: var(--cream);
+    --chat-ai-foreground: var(--charcoal);
+    --chat-success: var(--brand-success);
+    --chat-warning: var(--brand-warning);
+    --chat-ai-border: var(--sand);
 
-    --sidebar-background: 0 0% 10%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 36 36% 53%;
+    --sidebar-background: var(--charcoal);
+    --sidebar-foreground: var(--cream);
+    --sidebar-primary: var(--copper);
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 18%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 0 0% 22%;
-    --sidebar-ring: 36 36% 53%;
-    --sidebar-muted: 30 16% 78%;
+    --sidebar-accent: 215 28% 22%;
+    --sidebar-accent-foreground: var(--cream);
+    --sidebar-border: var(--warm-stone);
+    --sidebar-ring: var(--copper);
+    --sidebar-muted: var(--sand);
 
-    --gradient-trust: linear-gradient(135deg, hsl(36, 36%, 53%), hsl(36, 30%, 45%));
-    --gradient-health: linear-gradient(135deg, hsl(172, 50%, 38%), hsl(158, 45%, 42%));
-    --gradient-warm: linear-gradient(180deg, hsl(0, 0%, 10%), hsl(0, 0%, 8%));
+    --font-display: Georgia, "Times New Roman", serif;
+    --font-body: var(--font-eb-garamond), Garamond, Palatino, Georgia, serif;
 
-    --font-display: "Source Serif 4", Georgia, serif;
-    --font-body: "DM Sans", system-ui, sans-serif;
-    --font-brand: Georgia, "Times New Roman", serif;
-
-    --shadow-card: 0 1px 3px 0 hsla(0, 0%, 0%, 0.3),
-      0 4px 12px -2px hsla(0, 0%, 0%, 0.25);
-    --shadow-card-hover: 0 4px 16px -2px hsla(0, 0%, 0%, 0.35),
-      0 8px 24px -4px hsla(0, 0%, 0%, 0.3);
-    --shadow-elevated: 0 8px 30px -6px hsla(0, 0%, 0%, 0.4);
+    --shadow-card: 0 1px 0 0 hsl(var(--sand) / 0.6);
+    --shadow-card-hover: 0 2px 8px -2px hsl(var(--charcoal) / 0.08);
+    --shadow-elevated: 0 8px 24px -4px hsl(var(--charcoal) / 0.12);
   }
 }
 
@@ -76,9 +82,14 @@
   * {
     @apply border-border;
   }
+  html {
+    @apply scroll-smooth;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.5;
   }
   h1,
   h2,
@@ -87,13 +98,34 @@
   h5,
   h6 {
     font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 1.2;
+    color: hsl(var(--charcoal));
+  }
+  h1 {
+    font-size: 1.125rem;
+  }
+  h2 {
+    font-size: 0.875rem;
+    color: hsl(var(--warm-stone));
+  }
+  h3 {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: hsl(var(--warm-stone));
+  }
+  a {
+    @apply text-primary no-underline transition-colors;
+  }
+  a:hover {
+    @apply underline;
   }
 }
 
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--foreground-tertiary) / 0.5) transparent;
+    scrollbar-color: hsl(var(--sand) / 0.7) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 5px;
@@ -102,7 +134,7 @@
     background: transparent;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--foreground-tertiary) / 0.5);
+    background-color: hsl(var(--sand) / 0.7);
     border-radius: 9999px;
   }
   .shadow-card {
@@ -114,13 +146,38 @@
   .shadow-elevated {
     box-shadow: var(--shadow-elevated);
   }
-  .gradient-trust {
-    background: var(--gradient-trust);
-  }
-  .gradient-health {
-    background: var(--gradient-health);
-  }
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* Inline / card loading: soft breathe (brand: no spinners; opacity on cream ~0.6–1). */
+  .cream-pulse {
+    animation: cream-pulse-breathe 2.2s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+    will-change: opacity;
+  }
+  @keyframes cream-pulse-breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    22% {
+      opacity: 0.92;
+    }
+    50% {
+      opacity: 0.58;
+    }
+    78% {
+      opacity: 0.9;
+    }
+  }
+  .nav-progress-indeterminate {
+    animation: nav-progress-slide 1.2s ease-in-out infinite;
+  }
+  @keyframes nav-progress-slide {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(350%);
+    }
   }
 }

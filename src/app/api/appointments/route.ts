@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listAppointments, createAppointment } from "@/lib/appointment-store";
+import { getClientScope, attachScopeHeaders } from "@/lib/request-scope";
 
-/** GET: list all appointments (for "My Appointments" sidebar). */
-export async function GET() {
+/** GET: list appointments for this client scope only. */
+export async function GET(req: NextRequest) {
+  const scope = getClientScope(req);
   try {
-    const appointments = await listAppointments();
-    return NextResponse.json({ appointments });
+    const appointments = await listAppointments(scope.key);
+    return attachScopeHeaders(NextResponse.json({ appointments }), scope);
   } catch (e) {
     console.error("GET /api/appointments error:", e);
-    return NextResponse.json(
-      { error: "Failed to list appointments" },
-      { status: 500 }
+    return attachScopeHeaders(
+      NextResponse.json({ error: "Failed to list appointments" }, { status: 500 }),
+      scope
     );
   }
 }
 
-/** POST: create an appointment (after user selects date/time). */
+/** POST: create an appointment in this client scope. */
 export async function POST(req: NextRequest) {
+  const scope = getClientScope(req);
   try {
     const body = await req.json();
     const {
@@ -36,13 +39,16 @@ export async function POST(req: NextRequest) {
     } = body;
 
     if (!conversation_id || !doctor_id || !doctor_name || !datetime) {
-      return NextResponse.json(
-        { error: "conversation_id, doctor_id, doctor_name, and datetime are required" },
-        { status: 400 }
+      return attachScopeHeaders(
+        NextResponse.json(
+          { error: "conversation_id, doctor_id, doctor_name, and datetime are required" },
+          { status: 400 }
+        ),
+        scope
       );
     }
 
-    const record = await createAppointment({
+    const record = await createAppointment(scope.key, {
       conversation_id,
       doctor_id,
       doctor_name,
@@ -50,12 +56,12 @@ export async function POST(req: NextRequest) {
       datetime,
       ...(appointment_type && { appointment_type }),
     });
-    return NextResponse.json({ appointment: record });
+    return attachScopeHeaders(NextResponse.json({ appointment: record }), scope);
   } catch (e) {
     console.error("POST /api/appointments error:", e);
-    return NextResponse.json(
-      { error: "Failed to create appointment" },
-      { status: 500 }
+    return attachScopeHeaders(
+      NextResponse.json({ error: "Failed to create appointment" }, { status: 500 }),
+      scope
     );
   }
 }

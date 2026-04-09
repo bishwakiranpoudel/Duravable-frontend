@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getClientScope, attachScopeHeaders } from "@/lib/request-scope";
 import { chatWithGemini, searchDoctorsWithGemini, searchDoctorsByDetails } from "@/lib/gemini";
 import { parseRecommendedDoctorType, looksLikeDoctorRecommendation, isSpecialistType } from "@/lib/doctorType";
 import {
@@ -149,7 +150,7 @@ function parsedToMessageDoctors(
       name,
       specialty: d.specialty ?? doctorType,
       rating: d.rating ?? 4.5,
-      distance: "—",
+      distance: "N/A",
       description,
       avatar,
       available: "Contact for availability",
@@ -178,6 +179,7 @@ function mockToMessageDoctors(docs: Doctor[]): ConversationMessageDoctor[] {
 }
 
 export async function POST(req: NextRequest) {
+  const scope = getClientScope(req);
   try {
     const body = await req.json();
     const {
@@ -195,9 +197,9 @@ export async function POST(req: NextRequest) {
     } = body;
 
     if (!userMessage?.trim()) {
-      return NextResponse.json(
-        { error: "userMessage is required" },
-        { status: 400 }
+      return attachScopeHeaders(
+        NextResponse.json({ error: "userMessage is required" }, { status: 400 }),
+        scope
       );
     }
 
@@ -210,7 +212,7 @@ export async function POST(req: NextRequest) {
         content: m.content,
       }));
 
-    const contextRecord = await getConversation(conversationId);
+    const contextRecord = await getConversation(scope.key, conversationId);
     const priorMessages: ConversationMessage[] = (messages || []).map(
       (m: { id: string; role: string; content: string; timestamp: string; doctors?: unknown }) => {
         const base = { id: m.id, role: m.role as "user" | "assistant" | "system", content: m.content, timestamp: new Date(m.timestamp) };
@@ -261,18 +263,21 @@ export async function POST(req: NextRequest) {
         assistantMsg,
         ...doctorListMessage,
       ];
-      await setConversation(conversationId, allMessages, {
+      await setConversation(scope.key, conversationId, allMessages, {
         doctor_recommendation: contextRecord.doctor_recommendation ?? null,
         symptoms: contextRecord.symptoms ?? [],
         selected_doctor: selectedDoctor ?? contextRecord.selected_doctor ?? null,
         funds_allocated: fundsAllocated ?? contextRecord.funds_allocated ?? null,
         pending_doctor_details: false,
       });
-      return NextResponse.json({
-        conversationId,
-        message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
-        doctors: doctorsList,
-      });
+      return attachScopeHeaders(
+        NextResponse.json({
+          conversationId,
+          message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
+          doctors: doctorsList,
+        }),
+        scope
+      );
     }
 
     // --- Last turn asked "doctor in mind"; this message is Yes/No ---
@@ -311,17 +316,20 @@ export async function POST(req: NextRequest) {
           },
         ];
         const allMessages: ConversationMessage[] = [...priorMessages, userMsg, assistantMsg, ...doctorListMessage];
-        await setConversation(conversationId, allMessages, {
+        await setConversation(scope.key, conversationId, allMessages, {
           doctor_recommendation: type,
           symptoms: contextRecord?.symptoms ?? [],
           selected_doctor: selectedDoctor ?? contextRecord?.selected_doctor ?? null,
           funds_allocated: fundsAllocated ?? contextRecord?.funds_allocated ?? null,
         });
-        return NextResponse.json({
-          conversationId,
-          message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
-          doctors: doctorsList,
-        });
+        return attachScopeHeaders(
+          NextResponse.json({
+            conversationId,
+            message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
+            doctors: doctorsList,
+          }),
+          scope
+        );
       }
       if (isDoctorInMindYes(userMessage.trim())) {
         const replyContent = "Please share your doctor's **name** or **clinic name** so I can look them up.";
@@ -332,17 +340,20 @@ export async function POST(req: NextRequest) {
           timestamp: new Date(),
         };
         const allMessages: ConversationMessage[] = [...priorMessages, userMsg, assistantMsg];
-        await setConversation(conversationId, allMessages, {
+        await setConversation(scope.key, conversationId, allMessages, {
           doctor_recommendation: type,
           symptoms: contextRecord?.symptoms ?? [],
           selected_doctor: selectedDoctor ?? contextRecord?.selected_doctor ?? null,
           funds_allocated: fundsAllocated ?? contextRecord?.funds_allocated ?? null,
           pending_doctor_details: true,
         });
-        return NextResponse.json({
-          conversationId,
-          message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
-        });
+        return attachScopeHeaders(
+          NextResponse.json({
+            conversationId,
+            message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
+          }),
+          scope
+        );
       }
     }
 
@@ -358,17 +369,20 @@ export async function POST(req: NextRequest) {
           timestamp: new Date(),
         };
         const allMessages: ConversationMessage[] = [...priorMessages, userMsg, assistantMsg];
-        await setConversation(conversationId, allMessages, {
+        await setConversation(scope.key, conversationId, allMessages, {
           doctor_recommendation: type,
           symptoms: contextRecord?.symptoms ?? [],
           selected_doctor: selectedDoctor ?? contextRecord?.selected_doctor ?? null,
           funds_allocated: fundsAllocated ?? contextRecord?.funds_allocated ?? null,
         });
-        return NextResponse.json({
-          conversationId,
-          message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
-          askDoctorInMind: true,
-        });
+        return attachScopeHeaders(
+          NextResponse.json({
+            conversationId,
+            message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
+            askDoctorInMind: true,
+          }),
+          scope
+        );
       }
       if (isDigitalChoice(userMessage.trim())) {
         const replyContent =
@@ -380,17 +394,20 @@ export async function POST(req: NextRequest) {
           timestamp: new Date(),
         };
         const allMessages: ConversationMessage[] = [...priorMessages, userMsg, assistantMsg];
-        await setConversation(conversationId, allMessages, {
+        await setConversation(scope.key, conversationId, allMessages, {
           doctor_recommendation: contextRecord?.doctor_recommendation ?? null,
           symptoms: contextRecord?.symptoms ?? [],
           selected_doctor: selectedDoctor ?? contextRecord?.selected_doctor ?? null,
           funds_allocated: fundsAllocated ?? contextRecord?.funds_allocated ?? null,
         });
-        return NextResponse.json({
-          conversationId,
-          message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
-          showDigitalScheduler: true,
-        });
+        return attachScopeHeaders(
+          NextResponse.json({
+            conversationId,
+            message: { id: assistantMsg.id, role: "assistant" as const, content: replyContent, timestamp: assistantMsg.timestamp },
+            showDigitalScheduler: true,
+          }),
+          scope
+        );
       }
     }
 
@@ -494,7 +511,7 @@ export async function POST(req: NextRequest) {
         ? String(parsedAmount)
         : fundsAllocated ?? contextRecord?.funds_allocated ?? null;
 
-    await setConversation(conversationId, allMessages, {
+    await setConversation(scope.key, conversationId, allMessages, {
       doctor_recommendation: resolvedRecommendation ?? contextRecord?.doctor_recommendation ?? null,
       symptoms: contextRecord?.symptoms ?? [],
       selected_doctor: selectedDoctor ?? contextRecord?.selected_doctor ?? null,
@@ -553,12 +570,12 @@ export async function POST(req: NextRequest) {
       responsePayload.isLargeProcedure = parsedAmount >= PAYMENT_MODEL.LARGE_PROCEDURE_THRESHOLD_USD;
       responsePayload.showAllocationSteps = true;
     }
-    return NextResponse.json(responsePayload);
+    return attachScopeHeaders(NextResponse.json(responsePayload), scope);
   } catch (e) {
     console.error("POST /api/chat error:", e);
-    return NextResponse.json(
-      { error: "Failed to get assistant response" },
-      { status: 500 }
+    return attachScopeHeaders(
+      NextResponse.json({ error: "Failed to get assistant response" }, { status: 500 }),
+      scope
     );
   }
 }

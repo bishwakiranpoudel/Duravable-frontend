@@ -3,10 +3,10 @@
 import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import DoctorCard from "./DoctorCard";
-import type { ChatMessage as ChatMessageType, Doctor, CalendarEventPayload } from "@/lib/mockData";
+import type { ChatMessage as ChatMessageType, Doctor } from "@/lib/mockData";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ShieldCheck, CircleCheckBig, Bot, CalendarPlus, Video } from "lucide-react";
+import { ShieldCheck, CircleCheckBig, CalendarPlus, Video } from "lucide-react";
 
 const AddToCalendarButton = dynamic(
   () => import("add-to-calendar-button-react").then((mod) => mod.AddToCalendarButton),
@@ -19,9 +19,9 @@ interface ChatMessageProps {
 }
 
 const authIcons: Record<number, React.ReactNode> = {
-  1: <ShieldCheck className="h-4 w-4 text-primary animate-pulse" />,
-  2: <CircleCheckBig className="h-4 w-4 text-primary" />,
-  3: <CircleCheckBig className="h-4 w-4 text-primary" />,
+  1: <ShieldCheck className="h-4 w-4 text-[hsl(var(--copper))]" strokeWidth={1.5} />,
+  2: <CircleCheckBig className="h-4 w-4 text-[hsl(var(--copper))]" strokeWidth={1.5} />,
+  3: <CircleCheckBig className="h-4 w-4 text-[hsl(var(--copper))]" strokeWidth={1.5} />,
 };
 
 export default function ChatMessageComponent({
@@ -38,26 +38,26 @@ export default function ChatMessageComponent({
       className={`flex items-start gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-3 ${isUser ? "flex-row-reverse" : ""}`}
     >
       <div
-        className={`flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl font-display text-xs font-bold ${
+        className={`flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded border text-xs font-bold font-display ${
           isUser
-            ? "gradient-trust text-primary-foreground"
-            : "gradient-trust text-primary-foreground"
+            ? "border-[hsl(var(--copper))] bg-[hsl(var(--copper))] text-white"
+            : "border-[hsl(var(--sand))] bg-white text-[hsl(var(--copper))]"
         }`}
       >
-        {isUser ? "AJ" : <Bot className="h-4 w-4" />}
+        {isUser ? "AJ" : <span className="text-sm font-bold">V</span>}
       </div>
 
       <div className="max-w-[88%] sm:max-w-[80%] md:max-w-[70%] space-y-2 sm:space-y-3">
         {!isUser && (
-          <span className="text-[10px] sm:text-[11px] font-semibold text-primary font-body ml-1">
-            DVRABLE Bot
+          <span className="text-[10px] sm:text-[11px] font-bold text-[hsl(var(--charcoal))] font-display ml-0.5">
+            DVRABLE
           </span>
         )}
         <div
-          className={`rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 ${
+          className={`rounded rounded-[4px] px-3 sm:px-4 py-2.5 sm:py-3 border shadow-card ${
             isUser
-              ? "rounded-tr-sm gradient-trust text-primary-foreground"
-              : "rounded-tl-sm bg-card text-white border border-chat-ai-border shadow-card"
+              ? "rounded-tr-sm bg-[hsl(var(--copper))] border-[hsl(var(--copper))] text-white"
+              : "rounded-tl-sm bg-[hsl(var(--cream))] border-[hsl(var(--sand))] text-[hsl(var(--charcoal))]"
           }`}
         >
           {message.authorizationStep &&
@@ -67,16 +67,18 @@ export default function ChatMessageComponent({
               </div>
             )}
           <div
-            className={`prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-ul:my-1 text-[13px] sm:text-sm [&_*]:text-white ${
-              isUser ? "prose-invert" : "prose-invert prose-strong:text-white"
-            }`}
+            className={
+              isUser
+                ? "prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-ul:my-1 text-[13px] sm:text-sm text-white prose-headings:text-white prose-strong:text-white prose-a:text-white prose-a:underline-offset-2 hover:prose-a:underline"
+                : "prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 prose-ul:my-1 text-[13px] sm:text-sm text-[hsl(var(--charcoal))] prose-headings:font-display prose-headings:text-[hsl(var(--charcoal))] prose-strong:text-[hsl(var(--charcoal))] prose-a:text-[hsl(var(--copper))] prose-a:no-underline hover:prose-a:underline"
+            }
           >
             <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
           {!isUser && message.calendarEvent && (
-            <div className="mt-3 pt-3 border-t border-white/20" key={`add-to-cal-${message.id}`}>
-              <p className="text-[11px] font-medium text-white/90 mb-2 flex items-center gap-1.5">
-                <CalendarPlus className="h-3.5 w-3.5" />
+            <div className="mt-3 pt-3 border-t border-[hsl(var(--sand))]" key={`add-to-cal-${message.id}`}>
+              <p className="text-[11px] font-display font-semibold text-[hsl(var(--charcoal))] mb-2 flex items-center gap-1.5">
+                <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.5} />
                 Add to calendar
               </p>
               <AddToCalendarButton
@@ -91,17 +93,17 @@ export default function ChatMessageComponent({
                 buttonStyle="round"
                 size="5"
                 lightMode="light"
-                styleLight="--btn-background: rgba(255,255,255,0.95); --btn-text: #1a1a1a; --btn-text-hover: #1a1a1a;"
+                styleLight="--btn-background: #FFFFFF; --btn-text: #1F2937; --btn-text-hover: #1F2937; --btn-border: #B8A99A;"
               />
             </div>
           )}
           {!isUser && message.linkToVisit && (
-            <div className="mt-3 pt-3 border-t border-white/20">
+            <div className="mt-3 pt-3 border-t border-[hsl(var(--sand))]">
               <Link
                 href={message.linkToVisit}
-                className="inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-white/25 transition-colors"
+                className="inline-flex items-center gap-2 rounded-[4px] bg-[hsl(var(--copper))] px-4 py-2.5 text-[13px] font-display font-bold text-white hover:opacity-90 transition-opacity no-underline"
               >
-                <Video className="h-4 w-4" />
+                <Video className="h-4 w-4" strokeWidth={1.5} />
                 Join your visit
               </Link>
             </div>

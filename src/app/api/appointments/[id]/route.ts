@@ -1,26 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAppointment } from "@/lib/appointment-store";
+import { getClientScope, attachScopeHeaders } from "@/lib/request-scope";
 
-/** GET: fetch a single appointment by id (e.g. for digital doctor page). */
+/** GET: fetch a single appointment if it belongs to this client scope. */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const scope = getClientScope(req);
   try {
     const { id } = await params;
     if (!id) {
-      return NextResponse.json({ error: "Appointment id is required" }, { status: 400 });
+      return attachScopeHeaders(
+        NextResponse.json({ error: "Appointment id is required" }, { status: 400 }),
+        scope
+      );
     }
-    const appointment = await getAppointment(id);
+    const appointment = await getAppointment(scope.key, id);
     if (!appointment) {
-      return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+      return attachScopeHeaders(
+        NextResponse.json({ error: "Appointment not found" }, { status: 404 }),
+        scope
+      );
     }
-    return NextResponse.json({ appointment });
+    return attachScopeHeaders(NextResponse.json({ appointment }), scope);
   } catch (e) {
     console.error("GET /api/appointments/[id] error:", e);
-    return NextResponse.json(
-      { error: "Failed to fetch appointment" },
-      { status: 500 }
+    return attachScopeHeaders(
+      NextResponse.json({ error: "Failed to fetch appointment" }, { status: 500 }),
+      scope
     );
   }
 }

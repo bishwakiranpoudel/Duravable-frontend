@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { CalendarCheck, MessageSquare, ChevronLeft, CalendarX, Video } from "lucide-react";
 import type { AppointmentRecord } from "@/lib/conversation-types";
+import { DvrableWordmark } from "@/components/Wordmark";
+import { SiteFooter } from "@/components/SiteFooter";
 
 function formatAppointmentDateTime(iso: string) {
   const d = new Date(iso);
@@ -19,6 +21,21 @@ function formatAppointmentDateTime(iso: string) {
 
 function isUpcoming(iso: string) {
   return new Date(iso) >= new Date();
+}
+
+function InlineLoadingCard() {
+  return (
+    <div
+      className="rounded-[4px] border border-[hsl(var(--sand))] bg-[hsl(var(--cream))] px-6 py-12 cream-pulse flex flex-col items-center gap-3"
+      aria-busy
+      aria-label="Loading"
+    >
+      <div className="h-0.5 w-48 max-w-full bg-[hsl(var(--sand))] overflow-hidden rounded-full">
+        <div className="h-full w-1/3 bg-[hsl(var(--copper))] nav-progress-indeterminate" />
+      </div>
+      <p className="text-sm text-[hsl(var(--warm-stone))] font-body">Loading appointments</p>
+    </div>
+  );
 }
 
 export default function AppointmentsPage() {
@@ -58,43 +75,43 @@ export default function AppointmentsPage() {
   const past = scheduled.filter((a) => !isUpcoming(a.datetime));
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card/95 backdrop-blur-sm px-4 py-3">
+    <div className="min-h-[100dvh] flex flex-col bg-white">
+      <header className="sticky top-0 z-10 flex h-16 items-center gap-3 border-b border-[hsl(var(--sand))] bg-white px-4">
         <Link
           href="/"
-          className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-muted transition-colors text-foreground"
+          className="flex h-9 w-9 items-center justify-center rounded-[4px] hover:bg-[hsl(var(--cream))] transition-colors text-[hsl(var(--charcoal))]"
           aria-label="Back to chat"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ChevronLeft className="h-6 w-6" strokeWidth={1.5} />
         </Link>
-        <h1 className="font-display text-lg font-semibold text-foreground">
+        <h1 className="font-display text-lg font-bold text-[hsl(var(--charcoal))]">
           My Appointments
         </h1>
+        <div className="ml-auto hidden sm:block">
+          <DvrableWordmark variant="light" />
+        </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto" style={{ background: "var(--gradient-warm)" }}>
+      <main className="flex-1 overflow-y-auto bg-white">
         <div className="mx-auto max-w-2xl px-4 py-6">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-16 text-foreground-secondary">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              <p className="mt-3 text-sm">Loading appointments…</p>
-            </div>
+            <InlineLoadingCard />
           ) : scheduled.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/80 text-foreground-tertiary mb-4">
-                <CalendarX className="h-8 w-8" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-[4px] border border-[hsl(var(--sand))] bg-[hsl(var(--cream))] text-[hsl(var(--warm-stone))] mb-4">
+                <CalendarX className="h-8 w-8" strokeWidth={1.5} />
               </div>
-              <h2 className="text-lg font-semibold text-foreground mb-1">
+              <h2 className="text-lg font-display font-bold text-[hsl(var(--charcoal))] mb-1">
                 No upcoming appointments
               </h2>
-              <p className="text-sm text-foreground-secondary max-w-xs mb-6">
-                Start a chat to find a doctor and book a visit. You can schedule appointments and add them to your calendar from the chat.
+              <p className="text-sm text-[hsl(var(--warm-stone))] max-w-xs mb-6 font-body">
+                Start a chat to find a doctor and book a visit. You can schedule visits and add them to your calendar from the chat.
               </p>
               <Link
                 href="/"
-                className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 rounded-[4px] bg-[hsl(var(--copper))] px-5 py-2.5 text-sm font-display font-bold text-white hover:opacity-90 transition-opacity no-underline"
               >
-                <MessageSquare className="h-4 w-4" />
+                <MessageSquare className="h-4 w-4" strokeWidth={1.5} />
                 Start chat
               </Link>
             </div>
@@ -102,7 +119,7 @@ export default function AppointmentsPage() {
             <div className="space-y-6">
               {upcoming.length > 0 && (
                 <section>
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground-secondary mb-3">
+                  <h2 className="text-xs font-display font-bold uppercase tracking-wider text-[hsl(var(--warm-stone))] mb-3">
                     Upcoming
                   </h2>
                   <ul className="space-y-3">
@@ -110,24 +127,26 @@ export default function AppointmentsPage() {
                       const isDigital = apt.appointment_type === "digital";
                       return (
                         <li key={apt.id}>
-                          <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+                          <div className="rounded-[4px] border border-[hsl(var(--sand))] bg-white p-4 shadow-card">
                             <div className="flex items-start gap-3">
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                                <CalendarCheck className="h-5 w-5" />
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-[hsl(var(--sand))] text-[hsl(var(--copper))]">
+                                <CalendarCheck className="h-5 w-5" strokeWidth={1.5} />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="font-semibold text-foreground">
+                                <p className="font-display font-bold text-[hsl(var(--charcoal))]">
                                   {apt.doctor_name}
                                   {isDigital && (
-                                    <span className="ml-2 text-xs font-normal text-foreground-secondary">(Digital)</span>
+                                    <span className="ml-2 text-xs font-normal text-[hsl(var(--warm-stone))]">
+                                      (Digital)
+                                    </span>
                                   )}
                                 </p>
                                 {apt.doctor_specialty && !isDigital && (
-                                  <p className="text-sm text-foreground-secondary mt-0.5">
+                                  <p className="text-sm text-[hsl(var(--warm-stone))] mt-0.5 font-body">
                                     {apt.doctor_specialty}
                                   </p>
                                 )}
-                                <p className="text-sm text-foreground-tertiary mt-1">
+                                <p className="text-sm text-[hsl(var(--warm-stone))] mt-1 font-body">
                                   {formatAppointmentDateTime(apt.datetime)}
                                 </p>
                               </div>
@@ -135,23 +154,19 @@ export default function AppointmentsPage() {
                                 {isDigital && apt.id && (
                                   <Link
                                     href={`/digitaldoctor/${apt.id}`}
-                                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+                                    className="inline-flex items-center gap-1.5 rounded-[4px] bg-[hsl(var(--copper))] px-3 py-2 text-sm font-display font-bold text-white hover:opacity-90 transition-opacity no-underline"
                                     aria-label={`Join digital visit with ${apt.doctor_name}`}
                                   >
-                                    <Video className="h-4 w-4" />
+                                    <Video className="h-4 w-4" strokeWidth={1.5} />
                                     Join visit
                                   </Link>
                                 )}
                                 <Link
                                   href={`/?conversation=${encodeURIComponent(apt.conversation_id)}`}
-                                  className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
-                                    isDigital
-                                      ? "bg-primary/10 text-primary hover:bg-primary/20"
-                                      : "bg-primary/10 text-primary hover:bg-primary/20"
-                                  }`}
+                                  className="inline-flex items-center gap-1.5 rounded-[4px] border border-[hsl(var(--copper))] bg-white px-3 py-2 text-sm font-body font-medium text-[hsl(var(--copper))] hover:bg-[hsl(var(--cream))] transition-colors no-underline"
                                   aria-label={`Open chat for appointment with ${apt.doctor_name}`}
                                 >
-                                  <MessageSquare className="h-4 w-4" />
+                                  <MessageSquare className="h-4 w-4" strokeWidth={1.5} />
                                   Open chat
                                 </Link>
                               </div>
@@ -166,7 +181,7 @@ export default function AppointmentsPage() {
 
               {past.length > 0 && (
                 <section>
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground-secondary mb-3">
+                  <h2 className="text-xs font-display font-bold uppercase tracking-wider text-[hsl(var(--warm-stone))] mb-3">
                     Past
                   </h2>
                   <ul className="space-y-3">
@@ -174,33 +189,35 @@ export default function AppointmentsPage() {
                       const isDigital = apt.appointment_type === "digital";
                       return (
                         <li key={apt.id}>
-                          <div className="rounded-2xl border border-border bg-card/80 p-4 opacity-80">
+                          <div className="rounded-[4px] border border-[hsl(var(--sand))] bg-[hsl(var(--cream))]/80 p-4 opacity-90">
                             <div className="flex items-start gap-3">
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground-tertiary">
-                                <CalendarCheck className="h-5 w-5" />
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border border-[hsl(var(--sand))] text-[hsl(var(--warm-stone))]">
+                                <CalendarCheck className="h-5 w-5" strokeWidth={1.5} />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="font-semibold text-foreground">
+                                <p className="font-display font-bold text-[hsl(var(--charcoal))]">
                                   {apt.doctor_name}
                                   {isDigital && (
-                                    <span className="ml-2 text-xs font-normal text-foreground-secondary">(Digital)</span>
+                                    <span className="ml-2 text-xs font-normal text-[hsl(var(--warm-stone))]">
+                                      (Digital)
+                                    </span>
                                   )}
                                 </p>
                                 {apt.doctor_specialty && !isDigital && (
-                                  <p className="text-sm text-foreground-secondary mt-0.5">
+                                  <p className="text-sm text-[hsl(var(--warm-stone))] mt-0.5 font-body">
                                     {apt.doctor_specialty}
                                   </p>
                                 )}
-                                <p className="text-sm text-foreground-tertiary mt-1">
+                                <p className="text-sm text-[hsl(var(--warm-stone))] mt-1 font-body">
                                   {formatAppointmentDateTime(apt.datetime)}
                                 </p>
                               </div>
                               <Link
                                 href={`/?conversation=${encodeURIComponent(apt.conversation_id)}`}
-                                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm font-medium text-foreground-secondary hover:bg-muted transition-colors"
+                                className="shrink-0 inline-flex items-center gap-1.5 rounded-[4px] border border-[hsl(var(--sand))] px-3 py-2 text-sm font-body font-medium text-[hsl(var(--warm-stone))] hover:bg-white transition-colors no-underline"
                                 aria-label={`Open chat for past appointment with ${apt.doctor_name}`}
                               >
-                                <MessageSquare className="h-4 w-4" />
+                                <MessageSquare className="h-4 w-4" strokeWidth={1.5} />
                                 Open chat
                               </Link>
                             </div>
@@ -215,6 +232,8 @@ export default function AppointmentsPage() {
           )}
         </div>
       </main>
+
+      <SiteFooter />
     </div>
   );
 }

@@ -15,9 +15,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["var(--font-display)", "Georgia", "serif"],
-        body: ["var(--font-body)", "system-ui", "sans-serif"],
-        brand: ["var(--font-brand)", "Georgia", "serif"],
+        display: ["var(--font-display)", "Georgia", "Times New Roman", "serif"],
+        body: ["var(--font-body)", "Garamond", "Palatino", "Georgia", "serif"],
+        brand: ["var(--font-display)", "Georgia", "Times New Roman", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
