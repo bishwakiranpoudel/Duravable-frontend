@@ -31,7 +31,6 @@ import {
   getAuthorizationMessages,
   normalizeFundsAmount,
   digitalDoctorPlaceholder,
-  NEGOTIATED_SERVICE_QUICK_LABELS,
   DOCTOR_SELECTION_NEGOTIATING_MESSAGE,
 } from "@/lib/mockData";
 import type { AppointmentRecord } from "@/lib/conversation-types";
@@ -55,12 +54,26 @@ const QUICK_ACTIONS: { label: string; Icon: LucideIcon }[] = [
   { label: "Schedule Procedure", Icon: CalendarPlus },
 ];
 
-function isNegotiatedServiceQuickLabel(text: string): boolean {
-  return (NEGOTIATED_SERVICE_QUICK_LABELS as readonly string[]).includes(text);
+/** Rx quick action only: immediate negotiated-service reply. */
+function isRxRefillNegotiatedQuickLabel(text: string): boolean {
+  return text.trim() === "Rx Refill";
 }
 
 const NEGOTIATED_SERVICE_ASSISTANT_REPLY =
   "The amount will be negotiated and paid directly. We'll get back to you once that's done.";
+
+/** First user turn: quick pick "Schedule Procedure" or free text about scheduling a procedure. */
+function isScheduleProcedureIntent(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  if (t === "schedule procedure") return true;
+  if (/\bprocedure\b/.test(t) && /\b(scheduled|schedule|scheduling)\b/.test(t)) return true;
+  return false;
+}
+
+const SCHEDULE_PROCEDURE_ASK_NEW_OR_ONGOING =
+  "Thanks—we can help with **scheduling a procedure**. First, **is this about a new issue or an ongoing issue?**";
+
+const SCHEDULE_PROCEDURE_AFTER_NEW_OR_ONGOING = NEGOTIATED_SERVICE_ASSISTANT_REPLY;
 
 /** Assistant message suggests showing "which conversation" picker (ongoing-issue flow). */
 function suggestsConversationPicker(content: string): boolean {
@@ -119,6 +132,8 @@ export default function HomePage() {
   const [selectedDoctorInfo, setSelectedDoctorInfo] = useState<{ id: string; name: string; specialty?: string } | null>(null);
   const [fundsAllocated, setFundsAllocated] = useState<string | null>(null);
   const [waitingForScheduleAnswer, setWaitingForScheduleAnswer] = useState(false);
+  /** After first message was schedule-procedure intent: wait for new vs. ongoing, then static negotiated line only (no picker branching yet). */
+  const [waitingProcedureNewOrOngoing, setWaitingProcedureNewOrOngoing] = useState(false);
   const [showDateTimePicker, setShowDateTimePicker] = useState(false);
   const [pendingScheduleDoctor, setPendingScheduleDoctor] = useState<Doctor | null>(null);
   const [pendingDigitalAppointment, setPendingDigitalAppointment] = useState(false);
@@ -213,6 +228,7 @@ export default function HomePage() {
       setSelectedDoctorInfo(data.selected_doctor ?? null);
       setFundsAllocated(data.funds_allocated ?? null);
       setWaitingForScheduleAnswer(false);
+      setWaitingProcedureNewOrOngoing(false);
       setShowDateTimePicker(false);
       setPendingScheduleDoctor(null);
       setPendingDigitalAppointment(false);
@@ -243,6 +259,7 @@ export default function HomePage() {
     setShowQuickActions(true);
     setShowOngoingConversationPicker(false);
     setWaitingForScheduleAnswer(false);
+    setWaitingProcedureNewOrOngoing(false);
     setShowDateTimePicker(false);
     setPendingScheduleDoctor(null);
     setPendingDigitalAppointment(false);
@@ -270,6 +287,48 @@ export default function HomePage() {
   const handleSend = async (text: string) => {
     setShowQuickActions(false);
     setShowOngoingConversationPicker(false);
+
+    // Staged schedule-procedure: user answered new vs. ongoing → static negotiated line only (no conversation picker yet).
+    if (waitingProcedureNewOrOngoing) {
+      setWaitingProcedureNewOrOngoing(false);
+      const userMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: text,
+        timestamp: new Date(),
+      };
+      const assistantMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: SCHEDULE_PROCEDURE_AFTER_NEW_OR_ONGOING,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => {
+        const next = [...prev, userMsg, assistantMsg];
+        if (conversationId) {
+          fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messages: next.map((m) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+                ...(m.doctors && { doctors: m.doctors }),
+                ...(m.calendarEvent && { calendarEvent: m.calendarEvent }),
+                ...(m.linkToVisit && { linkToVisit: m.linkToVisit }),
+              })),
+              selected_doctor: selectedDoctorInfo,
+              funds_allocated: fundsAllocated,
+            }),
+          }).catch(() => {});
+        }
+        return next;
+      });
+      loadConversations();
+      return;
+    }
 
     // Intercept: user answering "Should I schedule an appointment?"
     if (waitingForScheduleAnswer && pendingScheduleDoctor) {
@@ -306,7 +365,50 @@ export default function HomePage() {
       // Fall through to normal chat with same message
     }
 
-    if (isNegotiatedServiceQuickLabel(text)) {
+    const priorUserCount = messages.filter((m) => m.role === "user").length;
+    const isFirstUserMessage = priorUserCount === 0;
+    if (isFirstUserMessage && isScheduleProcedureIntent(text)) {
+      const userMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: text,
+        timestamp: new Date(),
+      };
+      const assistantMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: SCHEDULE_PROCEDURE_ASK_NEW_OR_ONGOING,
+        timestamp: new Date(),
+      };
+      setWaitingProcedureNewOrOngoing(true);
+      setMessages((prev) => {
+        const next = [...prev, userMsg, assistantMsg];
+        if (conversationId) {
+          fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messages: next.map((m) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+                ...(m.doctors && { doctors: m.doctors }),
+                ...(m.calendarEvent && { calendarEvent: m.calendarEvent }),
+                ...(m.linkToVisit && { linkToVisit: m.linkToVisit }),
+              })),
+              selected_doctor: selectedDoctorInfo,
+              funds_allocated: fundsAllocated,
+            }),
+          }).catch(() => {});
+        }
+        return next;
+      });
+      loadConversations();
+      return;
+    }
+
+    if (isRxRefillNegotiatedQuickLabel(text)) {
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "user",

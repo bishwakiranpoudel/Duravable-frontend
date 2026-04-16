@@ -252,13 +252,22 @@ export default function ChatSidebar({
           </p>
           <div className="rounded-[4px] border border-[hsl(var(--warm-stone))]/40 p-3 sm:p-4">
             <div className="flex items-center gap-2.5 mb-2.5 sm:mb-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-[hsl(var(--sand))]">
+              <Link
+                href="/profile"
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-[4px] border border-[hsl(var(--sand))] hover:bg-[hsl(var(--sidebar-accent))] transition-colors no-underline"
+                aria-label="Open member profile"
+              >
                 <User className="h-4 w-4 text-[hsl(var(--cream))]" strokeWidth={1.5} />
-              </div>
-              <div>
-                <span className="text-[13px] sm:text-sm font-display font-bold text-[hsl(var(--cream))]">
+              </Link>
+              <div className="min-w-0 flex-1">
+                <Link
+                  href="/profile"
+                  onClick={onClose}
+                  className="block text-[13px] sm:text-sm font-display font-bold text-[hsl(var(--cream))] no-underline hover:underline truncate"
+                >
                   {mockProfile.name}
-                </span>
+                </Link>
                 <p className="text-[10px] text-[hsl(var(--sand))] font-body">
                   Plan participant since 2022
                 </p>

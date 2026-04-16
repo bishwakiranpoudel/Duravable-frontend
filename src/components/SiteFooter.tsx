@@ -25,6 +25,12 @@ export function SiteFooter() {
           >
             My Appointments
           </Link>
+          <Link
+            href="/profile"
+            className="text-[13px] text-[hsl(var(--sand))] hover:text-[hsl(var(--cream))] no-underline hover:underline"
+          >
+            Member profile
+          </Link>
         </nav>
         <p className="text-xs text-[hsl(var(--sand))] mt-4">
           © {new Date().getFullYear()} DVRABLE Systems PBC

@@ -199,5 +199,5 @@ export function getAuthorizationMessages(amount = DEFAULT_FUNDS_USD): Omit<ChatM
   ];
 }
 
-/** Labels that receive the negotiated-service assistant reply (initial quick actions, etc.). */
+/** Quick-pick labels tied to negotiated-service flows. "Schedule Procedure" is staged in the chat UI (new/ongoing first); "Rx Refill" still gets the immediate reply. */
 export const NEGOTIATED_SERVICE_QUICK_LABELS = ["Rx Refill", "Schedule Procedure"] as const;
