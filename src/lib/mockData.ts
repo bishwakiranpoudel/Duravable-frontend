@@ -165,6 +165,10 @@ export function normalizeFundsAmount(value: string | undefined): string {
   return !Number.isNaN(num) && num > 0 ? String(Math.round(num)) : DEFAULT_FUNDS_USD;
 }
 
+/** Shown right after the user picks a doctor, before the availability / authorization steps. */
+export const DOCTOR_SELECTION_NEGOTIATING_MESSAGE =
+  "We're currently negotiating pricing and appointment slots with the doctor's office. Hang tight—we'll update you as soon as it's done.";
+
 /** Cash payment + health card. No copay/coverage/claim/deductible wording. */
 export function getAuthorizationMessages(amount = DEFAULT_FUNDS_USD): Omit<ChatMessage, "id">[] {
   const num = parseFloat(String(amount).replace(/[^0-9.]/g, "")) || 0;
@@ -188,9 +192,12 @@ export function getAuthorizationMessages(amount = DEFAULT_FUNDS_USD): Omit<ChatM
     },
     {
       role: "assistant",
-      content: `**Funds allocated.** $${amount} has been deposited into your health card for this visit. You are all set. Pay at the office with your health card.${networkNote}\n\n**Summary:**\n- Provider confirmed\n- Estimated visit cost: $${amount} (cash pay)\n\nAnything else I can help with?`,
+      content: `**Funds allocated.** $${amount} has been deposited into your health card for this visit. You are all set. Pay at the office with your health card.${networkNote}\n\n**Summary:**\n- Provider confirmed\n- Estimated visit cost: $${amount} (cash pay)\n\n**Rx refill or procedure:** For an **Rx refill** or to **schedule a procedure**, the amount will be negotiated and paid **directly**. We will get back to you once that is done.\n\nAnything else I can help with?`,
       timestamp: new Date(),
       authorizationStep: 3,
     },
   ];
 }
+
+/** Labels that receive the negotiated-service assistant reply (initial quick actions, etc.). */
+export const NEGOTIATED_SERVICE_QUICK_LABELS = ["Rx Refill", "Schedule Procedure"] as const;

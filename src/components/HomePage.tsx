@@ -13,6 +13,8 @@ import {
   RefreshCw,
   Smartphone,
   Building2,
+  Pill,
+  CalendarPlus,
   type LucideIcon,
 } from "lucide-react";
 import { DvrableWordmark, DvrableVMark } from "@/components/Wordmark";
@@ -25,7 +27,13 @@ import TypingIndicator from "@/components/TypingIndicator";
 import DateTimePicker from "@/components/DateTimePicker";
 import type { ChatMessage, Doctor } from "@/lib/mockData";
 import type { CalendarEventPayload } from "@/lib/mockData";
-import { getAuthorizationMessages, normalizeFundsAmount, digitalDoctorPlaceholder } from "@/lib/mockData";
+import {
+  getAuthorizationMessages,
+  normalizeFundsAmount,
+  digitalDoctorPlaceholder,
+  NEGOTIATED_SERVICE_QUICK_LABELS,
+  DOCTOR_SELECTION_NEGOTIATING_MESSAGE,
+} from "@/lib/mockData";
 import type { AppointmentRecord } from "@/lib/conversation-types";
 import { DIGITAL_DOCTOR } from "@/lib/constants";
 
@@ -43,7 +51,16 @@ const QUICK_ACTIONS: { label: string; Icon: LucideIcon }[] = [
   { label: "I was referred to a specialist", Icon: ClipboardList },
   { label: "New issue", Icon: CirclePlus },
   { label: "Ongoing issue", Icon: RefreshCw },
+  { label: "Rx Refill", Icon: Pill },
+  { label: "Schedule Procedure", Icon: CalendarPlus },
 ];
+
+function isNegotiatedServiceQuickLabel(text: string): boolean {
+  return (NEGOTIATED_SERVICE_QUICK_LABELS as readonly string[]).includes(text);
+}
+
+const NEGOTIATED_SERVICE_ASSISTANT_REPLY =
+  "The amount will be negotiated and paid directly. We'll get back to you once that's done.";
 
 /** Assistant message suggests showing "which conversation" picker (ongoing-issue flow). */
 function suggestsConversationPicker(content: string): boolean {
@@ -69,6 +86,11 @@ function formatConversationDate(iso: string): string {
 /** When showing Digital/In-person chips: remove any broken or truncated "Do you prefer to..." from the bubble, then append the promo line and full question inside the message. */
 const DIGITAL_VS_IN_PERSON_PROMO =
   "Skip the waiting room. See a digital doctor now or get an in-person appointment.";
+/** Shown when offering digital vs in-person so digital pricing is explicit (markdown in chat bubble). */
+const DIGITAL_DOCTOR_COST_COPY_MD =
+  "**Digital doctor:** **Zero charge to you**, and the visit is paid.";
+const DIGITAL_DOCTOR_COST_COPY_PLAIN =
+  "Digital doctor: zero charge to you, and the visit is paid.";
 const DIGITAL_VS_IN_PERSON_QUESTION =
   "Do you prefer to see a digital doctor or an in-person appointment?";
 
@@ -81,7 +103,7 @@ function formatMessageForDigitalVsInPersonChips(content: string): string {
     .replace(/\s+Do you prefer to[^.?!\n]*[.?!]?\s*$/i, "");
   trimmed = trimmed.trimEnd();
   if (!trimmed) return content;
-  return `${trimmed}\n\n${DIGITAL_VS_IN_PERSON_PROMO}\n\n**${DIGITAL_VS_IN_PERSON_QUESTION}**`;
+  return `${trimmed}\n\n${DIGITAL_VS_IN_PERSON_PROMO}\n\n${DIGITAL_DOCTOR_COST_COPY_MD}\n\n**${DIGITAL_VS_IN_PERSON_QUESTION}**`;
 }
 
 export default function HomePage() {
@@ -284,6 +306,46 @@ export default function HomePage() {
       // Fall through to normal chat with same message
     }
 
+    if (isNegotiatedServiceQuickLabel(text)) {
+      const userMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: text,
+        timestamp: new Date(),
+      };
+      const assistantMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: NEGOTIATED_SERVICE_ASSISTANT_REPLY,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => {
+        const next = [...prev, userMsg, assistantMsg];
+        if (conversationId) {
+          fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              messages: next.map((m) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+                timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : m.timestamp,
+                ...(m.doctors && { doctors: m.doctors }),
+                ...(m.calendarEvent && { calendarEvent: m.calendarEvent }),
+                ...(m.linkToVisit && { linkToVisit: m.linkToVisit }),
+              })),
+              selected_doctor: selectedDoctorInfo,
+              funds_allocated: fundsAllocated,
+            }),
+          }).catch(() => {});
+        }
+        return next;
+      });
+      loadConversations();
+      return;
+    }
+
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
@@ -459,6 +521,12 @@ export default function HomePage() {
       id: crypto.randomUUID(),
       timestamp: new Date(),
     }));
+    const negotiatingMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      content: DOCTOR_SELECTION_NEGOTIATING_MESSAGE,
+      timestamp: new Date(),
+    };
     const schedulePromptMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "assistant",
@@ -467,14 +535,20 @@ export default function HomePage() {
     };
     let delay = 1200;
 
+    setTimeout(() => {
+      addMessage(negotiatingMsg);
+      setIsTyping(false);
+    }, delay);
+    delay += 1600;
+
     authMsgsWithIds.forEach((msg, i) => {
       setTimeout(() => {
-        if (i === 0) setIsTyping(false);
         addMessage(msg);
         if (conversationId && i === authMsgsWithIds.length - 1) {
           const toStore = [
             ...messages,
             userMsg,
+            negotiatingMsg,
             ...authMsgsWithIds,
             schedulePromptMsg,
           ].map((m) => ({
@@ -729,6 +803,9 @@ export default function HomePage() {
               <div className="px-3 sm:px-4 py-3 sm:py-4">
                 <p className="text-xs font-display font-semibold text-[hsl(var(--warm-stone))] mb-2 sm:mb-2.5">
                   Choose an option
+                </p>
+                <p className="text-[11px] text-[hsl(var(--warm-stone))] mb-3 font-body leading-relaxed max-w-xl">
+                  {DIGITAL_DOCTOR_COST_COPY_PLAIN}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
