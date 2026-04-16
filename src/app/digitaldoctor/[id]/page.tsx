@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronLeft, Video, CalendarCheck } from "lucide-react";
+import { ChevronLeft, Video, CalendarCheck, LayoutDashboard } from "lucide-react";
 import { DIGITAL_DOCTOR } from "@/lib/constants";
 import type { AppointmentRecord } from "@/lib/conversation-types";
 import { DvrableWordmark } from "@/components/Wordmark";
@@ -208,12 +208,19 @@ export default function DigitalDoctorPage({
               </p>
             )}
 
-            <div className="mt-6 pt-4 border-t border-[hsl(var(--sand))]">
+            <div className="mt-6 pt-4 border-t border-[hsl(var(--sand))] flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
               <Link
                 href={`/?conversation=${encodeURIComponent(appointment.conversation_id)}`}
                 className="inline-flex items-center gap-2 text-sm font-display font-semibold text-[hsl(var(--copper))] no-underline hover:underline"
               >
                 Open chat for this visit
+              </Link>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center gap-2 rounded-[4px] border border-[hsl(var(--copper))] bg-white px-4 py-2.5 text-sm font-display font-semibold text-[hsl(var(--copper))] hover:bg-[hsl(var(--cream))] transition-colors no-underline sm:shrink-0"
+              >
+                <LayoutDashboard className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                Dashboard
               </Link>
             </div>
           </div>

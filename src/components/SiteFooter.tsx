@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MessageSquare, CalendarCheck, LayoutDashboard } from "lucide-react";
 import { DvrableWordmark } from "@/components/Wordmark";
 
 /**
@@ -12,24 +13,27 @@ export function SiteFooter() {
         <p className="font-body italic text-sm text-[hsl(var(--cream))]">
           by design.
         </p>
-        <nav className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2">
+        <nav className="flex flex-wrap justify-center gap-x-5 gap-y-2 mt-2">
           <Link
             href="/"
-            className="text-[13px] text-[hsl(var(--sand))] hover:text-[hsl(var(--cream))] no-underline hover:underline"
+            className="inline-flex items-center gap-1.5 text-[13px] text-[hsl(var(--sand))] hover:text-[hsl(var(--cream))] no-underline hover:underline"
           >
+            <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={1.5} aria-hidden />
             Chat
           </Link>
           <Link
             href="/appointments"
-            className="text-[13px] text-[hsl(var(--sand))] hover:text-[hsl(var(--cream))] no-underline hover:underline"
+            className="inline-flex items-center gap-1.5 text-[13px] text-[hsl(var(--sand))] hover:text-[hsl(var(--cream))] no-underline hover:underline"
           >
+            <CalendarCheck className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={1.5} aria-hidden />
             My Appointments
           </Link>
           <Link
-            href="/profile"
-            className="text-[13px] text-[hsl(var(--sand))] hover:text-[hsl(var(--cream))] no-underline hover:underline"
+            href="/dashboard"
+            className="inline-flex items-center gap-1.5 text-[13px] text-[hsl(var(--sand))] hover:text-[hsl(var(--cream))] no-underline hover:underline"
           >
-            Member profile
+            <LayoutDashboard className="h-3.5 w-3.5 shrink-0 opacity-90" strokeWidth={1.5} aria-hidden />
+            Dashboard
           </Link>
         </nav>
         <p className="text-xs text-[hsl(var(--sand))] mt-4">

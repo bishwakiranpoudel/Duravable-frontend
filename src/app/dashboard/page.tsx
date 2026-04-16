@@ -18,6 +18,7 @@ import {
   UserRound,
   Video,
   CalendarX,
+  LayoutDashboard,
 } from "lucide-react";
 import type { AppointmentRecord } from "@/lib/conversation-types";
 import { demoMemberDashboard } from "@/lib/member-dashboard-demo";
@@ -121,13 +122,13 @@ function ProfilePanel({
   );
 }
 
-export default function ProfileDashboardPage() {
+export default function DashboardPage() {
   const m = demoMemberDashboard;
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [loadingApts, setLoadingApts] = useState(true);
 
   useEffect(() => {
-    document.title = "Member profile | DVRABLE";
+    document.title = "Dashboard | DVRABLE";
     return () => {
       document.title = "DVRABLE";
     };
@@ -172,9 +173,14 @@ export default function ProfileDashboardPage() {
         >
           <ChevronLeft className="h-6 w-6" strokeWidth={1.5} />
         </Link>
-        <div className="min-w-0">
-          <h1 className="font-display text-lg font-bold text-[hsl(var(--charcoal))] truncate">Member profile</h1>
-          <p className="hidden sm:block text-[11px] font-body text-[hsl(var(--warm-stone))]">Coverage, plan, and visits</p>
+        <div className="min-w-0 flex items-center gap-2.5">
+          <div className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] border border-[hsl(var(--sand))] bg-[hsl(var(--cream))] text-[hsl(var(--copper))]">
+            <LayoutDashboard className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <h1 className="font-display text-lg font-bold text-[hsl(var(--charcoal))] truncate">Dashboard</h1>
+            <p className="hidden sm:block text-[11px] font-body text-[hsl(var(--warm-stone))]">Coverage, plan, and visits</p>
+          </div>
         </div>
         <div className="ml-auto hidden sm:block">
           <DvrableWordmark variant="light" />

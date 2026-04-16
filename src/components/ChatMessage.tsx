@@ -1,17 +1,12 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import ReactMarkdown from "react-markdown";
 import DoctorCard from "./DoctorCard";
 import type { ChatMessage as ChatMessageType, Doctor } from "@/lib/mockData";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ShieldCheck, CircleCheckBig, CalendarPlus, Video } from "lucide-react";
-
-const AddToCalendarButton = dynamic(
-  () => import("add-to-calendar-button-react").then((mod) => mod.AddToCalendarButton),
-  { ssr: false }
-);
+import { ShieldCheck, CircleCheckBig, Video, LayoutDashboard } from "lucide-react";
+import { CalendarEventActions } from "@/components/CalendarEventActions";
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -77,24 +72,19 @@ export default function ChatMessageComponent({
           </div>
           {!isUser && message.calendarEvent && (
             <div className="mt-3 pt-3 border-t border-[hsl(var(--sand))]" key={`add-to-cal-${message.id}`}>
-              <p className="text-[11px] font-display font-semibold text-[hsl(var(--charcoal))] mb-2 flex items-center gap-1.5">
-                <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.5} />
-                Add to calendar
+              <p className="mb-2 text-[10px] font-display font-bold uppercase tracking-[0.12em] text-[hsl(var(--warm-stone))]">
+                Next steps
               </p>
-              <AddToCalendarButton
-                name={message.calendarEvent.name}
-                startDate={message.calendarEvent.startDate}
-                startTime={message.calendarEvent.startTime}
-                endTime={message.calendarEvent.endTime}
-                timeZone={message.calendarEvent.timeZone ?? "America/Chicago"}
-                description={message.calendarEvent.description}
-                location={message.calendarEvent.location}
-                options={["Apple", "Google", "Outlook.com", "Yahoo", "iCal"]}
-                buttonStyle="round"
-                size="5"
-                lightMode="light"
-                styleLight="--btn-background: #FFFFFF; --btn-text: #1F2937; --btn-text-hover: #1F2937; --btn-border: #B8A99A;"
-              />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
+                <CalendarEventActions event={message.calendarEvent} className="sm:flex-1 sm:min-w-0" />
+                <Link
+                  href="/dashboard"
+                  className="flex h-11 min-h-[44px] flex-1 items-center justify-center gap-2 rounded-[4px] border border-[hsl(var(--copper))] bg-white px-4 py-2.5 text-[13px] font-display font-semibold text-[hsl(var(--copper))] shadow-card hover:bg-[hsl(var(--cream))] transition-colors no-underline sm:min-w-0"
+                >
+                  <LayoutDashboard className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                  Dashboard
+                </Link>
+              </div>
             </div>
           )}
           {!isUser && message.linkToVisit && (
